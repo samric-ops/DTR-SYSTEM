@@ -112,6 +112,9 @@ with st.sidebar:
             # Convert DateTime
             df['DateTime'] = pd.to_datetime(df['DateTime'], errors='coerce')
             
+            # Drop rows with invalid dates
+            df = df.dropna(subset=['DateTime'])
+            
             # Add derived columns
             df['Date'] = df['DateTime'].dt.date
             df['Time'] = df['DateTime'].dt.time
@@ -137,12 +140,24 @@ with st.sidebar:
     
     if st.session_state.df is not None:
         st.subheader("⚙️ Settings")
-        date_range = st.date_input(
-            "Select Date Range",
-            value=[st.session_state.df['Date'].min(), st.session_state.df['Date'].max()],
-            min_value=st.session_state.df['Date'].min(),
-            max_value=st.session_state.df['Date'].max()
-        )
+        
+        # Get date range safely
+        try:
+            min_date = st.session_state.df['Date'].min()
+            max_date = st.session_state.df['Date'].max()
+            
+            if pd.isna(min_date) or pd.isna(max_date):
+                min_date = datetime.now().date()
+                max_date = datetime.now().date()
+            
+            date_range = st.date_input(
+                "Select Date Range",
+                value=[min_date, max_date],
+                min_value=min_date,
+                max_value=max_date
+            )
+        except:
+            date_range = None
         
         user_ids = st.multiselect(
             "Select Users",
@@ -166,10 +181,9 @@ if st.session_state.df is not None:
     df = st.session_state.df
     
     # Apply filters
-    if 'date_range' in locals() and date_range:
-        if len(date_range) == 2:
-            mask = (df['Date'] >= date_range[0]) & (df['Date'] <= date_range[1])
-            df = df[mask]
+    if 'date_range' in locals() and date_range and len(date_range) == 2:
+        mask = (df['Date'] >= date_range[0]) & (df['Date'] <= date_range[1])
+        df = df[mask]
     
     if 'user_ids' in locals() and user_ids:
         df = df[df['UserID'].isin(user_ids)]
@@ -184,7 +198,10 @@ if st.session_state.df is not None:
         st.metric("Unique Users", df['UserID'].nunique())
     
     with col3:
-        st.metric("Date Range", f"{df['Date'].min()} to {df['Date'].max()}")
+        date_min = df['Date'].min()
+        date_max = df['Date'].max()
+        date_range_str = f"{date_min} to {date_max}" if pd.notna(date_min) and pd.notna(date_max) else "N/A"
+        st.metric("Date Range", date_range_str)
     
     with col4:
         avg_records = len(df) / df['UserID'].nunique() if df['UserID'].nunique() > 0 else 0
@@ -236,47 +253,52 @@ if st.session_state.df is not None:
             user_counts = df['UserID'].value_counts().reset_index()
             user_counts.columns = ['UserID', 'Count']
             
-            fig1 = px.bar(
-                user_counts.head(20),
-                x='UserID',
-                y='Count',
-                title="Top 20 Users by Record Count",
-                color='Count',
-                color_continuous_scale='Blues'
-            )
-            st.plotly_chart(fig1, use_container_width=True)
+            if not user_counts.empty:
+                fig1 = px.bar(
+                    user_counts.head(20),
+                    x='UserID',
+                    y='Count',
+                    title="Top 20 Users by Record Count",
+                    color='Count',
+                    color_continuous_scale='Blues'
+                )
+                st.plotly_chart(fig1, use_container_width=True)
         
         with col2:
             # Records by day of week
-            day_counts = df['Day'].value_counts().reset_index()
-            day_counts.columns = ['Day', 'Count']
-            
-            # Order days properly
-            day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-            day_counts['Day'] = pd.Categorical(day_counts['Day'], categories=day_order, ordered=True)
-            day_counts = day_counts.sort_values('Day')
-            
-            fig2 = px.bar(
-                day_counts,
-                x='Day',
-                y='Count',
-                title="Records by Day of Week",
-                color='Count',
-                color_continuous_scale='Greens'
-            )
-            st.plotly_chart(fig2, use_container_width=True)
+            if 'Day' in df.columns and not df.empty:
+                day_counts = df['Day'].value_counts().reset_index()
+                day_counts.columns = ['Day', 'Count']
+                
+                if not day_counts.empty:
+                    # Order days properly
+                    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    day_counts['Day'] = pd.Categorical(day_counts['Day'], categories=day_order, ordered=True)
+                    day_counts = day_counts.sort_values('Day')
+                    
+                    fig2 = px.bar(
+                        day_counts,
+                        x='Day',
+                        y='Count',
+                        title="Records by Day of Week",
+                        color='Count',
+                        color_continuous_scale='Greens'
+                    )
+                    st.plotly_chart(fig2, use_container_width=True)
         
         # Hourly distribution
-        hourly_data = df.groupby('Hour').size().reset_index(name='Count')
-        fig3 = px.line(
-            hourly_data,
-            x='Hour',
-            y='Count',
-            title="Hourly Distribution of Logs",
-            markers=True
-        )
-        fig3.update_layout(xaxis=dict(tickmode='linear', dtick=1))
-        st.plotly_chart(fig3, use_container_width=True)
+        if 'Hour' in df.columns and not df.empty:
+            hourly_data = df.groupby('Hour').size().reset_index(name='Count')
+            if not hourly_data.empty:
+                fig3 = px.line(
+                    hourly_data,
+                    x='Hour',
+                    y='Count',
+                    title="Hourly Distribution of Logs",
+                    markers=True
+                )
+                fig3.update_layout(xaxis=dict(tickmode='linear', dtick=1))
+                st.plotly_chart(fig3, use_container_width=True)
     
     with tab3:
         st.markdown('<h3 class="sub-header">Working Hours Calculation</h3>', unsafe_allow_html=True)
@@ -331,15 +353,16 @@ if st.session_state.df is not None:
                     st.dataframe(user_summary, use_container_width=True)
                     
                     # Visualization
-                    fig = px.bar(
-                        user_summary.reset_index(),
-                        x='UserID',
-                        y='Total Hours',
-                        title="Total Working Hours by User",
-                        color='Total Hours',
-                        color_continuous_scale='Viridis'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    if not user_summary.empty:
+                        fig = px.bar(
+                            user_summary.reset_index(),
+                            x='UserID',
+                            y='Total Hours',
+                            title="Total Working Hours by User",
+                            color='Total Hours',
+                            color_continuous_scale='Viridis'
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
             else:
                 st.warning("Not enough data to calculate working hours. Need at least 2 records per user per day.")
         
@@ -364,18 +387,33 @@ if st.session_state.df is not None:
                 col1, col2 = st.columns(2)
                 with col1:
                     st.metric("Total Records", len(user_data))
-                    st.metric("First Record", user_data['Date'].min())
-                    st.metric("Last Record", user_data['Date'].max())
-                
+                    
+                    # FIXED: Convert date to string
+                    first_record = user_data['Date'].min()
+                    last_record = user_data['Date'].max()
+                    
+                    if pd.notna(first_record):
+                        st.metric("First Record", str(first_record))
+                    else:
+                        st.metric("First Record", "N/A")
+                    
                 with col2:
                     days_active = user_data['Date'].nunique()
                     st.metric("Days Active", days_active)
-                    st.metric("Most Active Day", user_data['Day'].mode().iloc[0] if not user_data['Day'].mode().empty else "N/A")
+                    
+                    # FIXED: Check if mode is not empty
+                    if not user_data['Day'].mode().empty:
+                        most_active_day = user_data['Day'].mode().iloc[0]
+                        st.metric("Most Active Day", most_active_day)
+                    else:
+                        st.metric("Most Active Day", "N/A")
                 
                 # User's daily pattern
-                user_daily = user_data.groupby('Hour').size().reset_index(name='Count')
-                fig = px.line(user_daily, x='Hour', y='Count', title=f"User {selected_user} - Hourly Pattern")
-                st.plotly_chart(fig, use_container_width=True)
+                if 'Hour' in user_data.columns and not user_data.empty:
+                    user_daily = user_data.groupby('Hour').size().reset_index(name='Count')
+                    if not user_daily.empty:
+                        fig = px.line(user_daily, x='Hour', y='Count', title=f"User {selected_user} - Hourly Pattern")
+                        st.plotly_chart(fig, use_container_width=True)
         
         elif report_type == "Attendance Summary":
             # Generate summary report
@@ -383,12 +421,17 @@ if st.session_state.df is not None:
             
             for user_id in df['UserID'].unique():
                 user_df = df[df['UserID'] == user_id]
+                
+                # FIXED: Convert dates to string
+                first_date = user_df['Date'].min()
+                last_date = user_df['Date'].max()
+                
                 summary_data.append({
                     'UserID': user_id,
                     'Total Records': len(user_df),
                     'Days Active': user_df['Date'].nunique(),
-                    'First Date': user_df['Date'].min(),
-                    'Last Date': user_df['Date'].max(),
+                    'First Date': str(first_date) if pd.notna(first_date) else "N/A",
+                    'Last Date': str(last_date) if pd.notna(last_date) else "N/A",
                     'Most Common Hour': user_df['Hour'].mode().iloc[0] if not user_df['Hour'].mode().empty else "N/A"
                 })
             
