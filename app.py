@@ -202,34 +202,54 @@ def generate_civil_service_dtr(employee_no, employee_name, month, year, attendan
     # Get days in month
     days_in_month = calendar.monthrange(year, month)[1]
     
-    # Process attendance data by day
+    # Process attendance data by day - FIXED VERSION
     attendance_by_day = {}
     
-    if attendance_data is not None and not attendance_data.empty:
-        try:
-            for _, row in attendance_data.iterrows():
-                if 'Day' in row and 'Time' in row:
-                    day = int(row['Day']) if pd.notna(row['Day']) else 0
+    # CRITICAL FIX: Check if attendance_data is valid
+    if attendance_data is not None and isinstance(attendance_data, pd.DataFrame) and not attendance_data.empty:
+        # Make sure required columns exist
+        if 'Day' in attendance_data.columns and 'Time' in attendance_data.columns:
+            # Reset index to avoid issues
+            df_temp = attendance_data.reset_index(drop=True).copy()
+            
+            # Convert Day to integer if needed
+            if not pd.api.types.is_integer_dtype(df_temp['Day']):
+                df_temp['Day'] = pd.to_numeric(df_temp['Day'], errors='coerce')
+            
+            # Process each row
+            for index in range(len(df_temp)):
+                try:
+                    row = df_temp.iloc[index]
                     
+                    # Get day
+                    if pd.notna(row['Day']):
+                        day = int(float(row['Day']))  # Convert to int
+                    else:
+                        continue
+                    
+                    # Get time
                     if pd.notna(row['Time']):
                         time_val = row['Time']
                         if hasattr(time_val, 'strftime'):
                             time_str = time_val.strftime('%H:%M')
+                        elif isinstance(time_val, str):
+                            time_str = time_val
                         else:
                             time_str = str(time_val)
                         
-                        if day > 0:
+                        if 1 <= day <= 31:  # Valid day range
                             if day not in attendance_by_day:
                                 attendance_by_day[day] = []
                             attendance_by_day[day].append(time_str)
-        except:
-            pass
+                except:
+                    continue
     
     total_undertime_hours = 0
     total_undertime_minutes = 0
     
     # Fill table for each day
     for day in range(1, days_in_month + 1):
+        # Get day of week
         date_obj = datetime(year, month, day)
         day_name = date_obj.strftime('%A')
         
@@ -267,8 +287,16 @@ def generate_civil_service_dtr(employee_no, employee_name, month, year, attendan
             if day in attendance_by_day:
                 times = sorted(attendance_by_day[day])
                 
-                # AM times
-                am_times = [t for t in times if int(t.split(':')[0]) < 12] if times else []
+                # AM times (before 12:00)
+                am_times = []
+                for t in times:
+                    try:
+                        hour_part = int(t.split(':')[0])
+                        if hour_part < 12:
+                            am_times.append(t)
+                    except:
+                        continue
+                
                 if am_times:
                     ws[f'B{current_row}'] = am_times[0]
                     ws[f'C{current_row}'] = am_times[-1]
@@ -276,8 +304,16 @@ def generate_civil_service_dtr(employee_no, employee_name, month, year, attendan
                     ws[f'B{current_row}'] = ""
                     ws[f'C{current_row}'] = ""
                 
-                # PM times
-                pm_times = [t for t in times if int(t.split(':')[0]) >= 12] if times else []
+                # PM times (12:00 and after)
+                pm_times = []
+                for t in times:
+                    try:
+                        hour_part = int(t.split(':')[0])
+                        if hour_part >= 12:
+                            pm_times.append(t)
+                    except:
+                        continue
+                
                 if pm_times:
                     ws[f'D{current_row}'] = pm_times[0]
                     ws[f'E{current_row}'] = pm_times[-1]
@@ -302,6 +338,7 @@ def generate_civil_service_dtr(employee_no, employee_name, month, year, attendan
                 if undertime_minutes:
                     total_undertime_minutes += undertime_minutes
             else:
+                # No data for this day
                 for col in ['B', 'C', 'D', 'E', 'F', 'G']:
                     ws[f'{col}{current_row}'] = ""
             
@@ -469,7 +506,7 @@ def create_zip_file(excel_files, month, year):
     return zip_buffer
 
 # =============================================
-# STREAMLIT APP - FINAL FIXED VERSION
+# STREAMLIT APP - ULTIMATE FIXED VERSION
 # =============================================
 
 # Page configuration
@@ -484,8 +521,6 @@ if 'raw_data' not in st.session_state:
     st.session_state.raw_data = None
 if 'employee_settings' not in st.session_state:
     st.session_state.employee_settings = {}
-if 'employee_mapping' not in st.session_state:
-    st.session_state.employee_mapping = {}  # New: Map biometric ID to actual employee number
 if 'office_hours' not in st.session_state:
     st.session_state.office_hours = {
         'regular_am_in': '07:30',
@@ -510,43 +545,42 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file:
     try:
-        # Read file
+        # Read file as text
         content = uploaded_file.read().decode('utf-8', errors='ignore')
         lines = content.strip().split('\n')
         
-        # Parse data
+        # Parse data - SIMPLIFIED VERSION
         data = []
         for line in lines:
             if line.strip():
-                # Try different delimiters
-                if '\t' in line:
-                    parts = line.strip().split('\t')
-                elif ',' in line:
-                    parts = line.strip().split(',')
-                else:
-                    parts = line.strip().split()
+                # Split by tab or space
+                parts = line.replace('\t', ' ').strip().split()
                 
                 if len(parts) >= 2:
                     emp_no = parts[0].strip()
-                    datetime_str = parts[1].strip()
+                    datetime_str = ' '.join(parts[1:3]) if len(parts) >= 3 else parts[1]
                     
                     # Try to parse datetime
-                    for fmt in ['%Y-%m-%d %H:%M:%S', '%m/%d/%Y %H:%M:%S', '%d/%m/%Y %H:%M:%S', 
-                               '%Y%m%d %H:%M:%S', '%Y-%m-%d %H:%M', '%H:%M:%S %Y-%m-%d']:
+                    try:
+                        dt = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
+                    except:
                         try:
-                            dt = datetime.strptime(datetime_str, fmt)
-                            data.append({
-                                'EmployeeNo': emp_no,  # Biometric ID (1, 2, 3, etc.)
-                                'DateTime': dt,
-                                'Date': dt.date(),
-                                'Time': dt.time(),
-                                'Month': dt.month,
-                                'Year': dt.year,
-                                'Day': dt.day
-                            })
-                            break
+                            dt = datetime.strptime(datetime_str, '%m/%d/%Y %H:%M:%S')
                         except:
-                            continue
+                            try:
+                                dt = datetime.strptime(datetime_str, '%d/%m/%Y %H:%M:%S')
+                            except:
+                                continue
+                    
+                    data.append({
+                        'EmployeeNo': emp_no,
+                        'DateTime': dt,
+                        'Date': dt.date(),
+                        'Time': dt.time(),
+                        'Month': dt.month,
+                        'Year': dt.year,
+                        'Day': dt.day
+                    })
         
         if data:
             df = pd.DataFrame(data)
@@ -559,19 +593,13 @@ if uploaded_file:
             with col1:
                 st.metric("Total Records", len(df))
             with col2:
-                unique_emps = df['EmployeeNo'].nunique()
-                st.metric("Biometric IDs", unique_emps)
+                st.metric("Unique Employees", df['EmployeeNo'].nunique())
             with col3:
                 st.metric("Date Range", f"{df['Date'].min()} to {df['Date'].max()}")
             
             # Show sample
             with st.expander("👀 Preview Data"):
                 st.dataframe(df.head(20))
-                
-                # Show unique biometric IDs
-                st.write("**Biometric IDs found in file:**")
-                biometric_ids = sorted(df['EmployeeNo'].unique())
-                st.write(", ".join([str(id) for id in biometric_ids]))
         else:
             st.error("❌ Could not parse any valid records.")
             
@@ -599,53 +627,11 @@ st.session_state.office_hours = {
     'saturday': saturday_hours
 }
 
-# ========== EMPLOYEE MAPPING SECTION ==========
+# ========== MAIN PROCESSING SECTION ==========
 if st.session_state.raw_data is not None:
     df = st.session_state.raw_data
     
-    st.header("3. Employee Settings")
-    
-    # Get biometric IDs from file
-    biometric_ids = sorted(df['EmployeeNo'].unique())
-    
-    st.subheader("Map Biometric IDs to Employee Information")
-    st.info(f"Found {len(biometric_ids)} biometric IDs in the file: {', '.join([str(id) for id in biometric_ids])}")
-    
-    # Employee mapping editor
-    with st.expander("✏️ Edit Employee Information"):
-        for bio_id in biometric_ids:
-            col1, col2 = st.columns([1, 3])
-            with col1:
-                st.write(f"**Bio ID:** {bio_id}")
-            with col2:
-                # Get current mapping
-                current_mapping = st.session_state.employee_mapping.get(str(bio_id), {
-                    'employee_no': str(bio_id),
-                    'name': f"EMPLOYEE {bio_id}"
-                })
-                
-                # Employee Number
-                emp_no = st.text_input(
-                    f"Actual Employee No. for Bio ID {bio_id}",
-                    value=current_mapping['employee_no'],
-                    key=f"empno_{bio_id}"
-                )
-                
-                # Employee Name
-                emp_name = st.text_input(
-                    f"Full Name for Bio ID {bio_id}",
-                    value=current_mapping['name'],
-                    key=f"empname_{bio_id}"
-                )
-                
-                # Save mapping
-                st.session_state.employee_mapping[str(bio_id)] = {
-                    'employee_no': emp_no,
-                    'name': emp_name
-                }
-    
-    # ========== GENERATE DTR SECTION ==========
-    st.header("4. Generate DTR")
+    st.header("3. Generate DTR")
     
     # Month selection
     if 'Month' in df.columns and 'Year' in df.columns:
@@ -665,52 +651,93 @@ if st.session_state.raw_data is not None:
             month_num = list(calendar.month_name).index(month_name)
             year_num = int(year_str)
             
-            # Filter data for selected month
+            # Filter data for selected month - FIXED
             month_df = df[(df['Month'] == month_num) & (df['Year'] == year_num)].copy()
             
             if not month_df.empty:
+                # Summary
                 st.info(f"📊 **{len(month_df)} records found for {month_name} {year_num}**")
+                
+                # Get employees in this month
+                employees_in_month = sorted(month_df['EmployeeNo'].unique())
+                
+                # Employee names editor - SIMPLIFIED
+                with st.expander(f"✏️ Edit Employee Names ({len(employees_in_month)} employees)"):
+                    st.write("**Enter employee names for each biometric ID:**")
+                    
+                    for emp_id in employees_in_month:
+                        # Get current name
+                        current_name = st.session_state.employee_settings.get(
+                            emp_id, 
+                            {'name': f"EMPLOYEE {emp_id}"}
+                        )['name']
+                        
+                        # Edit field
+                        new_name = st.text_input(
+                            f"Biometric ID: {emp_id}",
+                            value=current_name,
+                            key=f"name_{emp_id}_{month_name}_{year_num}"  # Unique key
+                        )
+                        
+                        # Save to session state
+                        st.session_state.employee_settings[emp_id] = {
+                            'name': new_name,
+                            'employee_no': emp_id
+                        }
                 
                 # Generate button
                 st.markdown("---")
                 
                 if st.button("🚀 GENERATE DTR FILES NOW", type="primary", use_container_width=True):
-                    with st.spinner(f"Generating DTR files..."):
+                    with st.spinner(f"Generating DTR files for {len(employees_in_month)} employees..."):
                         excel_files = []
                         success_count = 0
-                        error_messages = []
+                        error_details = []
                         
-                        # Process each biometric ID
-                        for bio_id in biometric_ids:
+                        for emp_id in employees_in_month:
                             try:
-                                # Get records for this biometric ID
-                                emp_df = month_df[month_df['EmployeeNo'] == bio_id].copy()
+                                # FIXED: Get employee data - ensure it's not None
+                                emp_df = month_df[month_df['EmployeeNo'] == emp_id].copy()
                                 
-                                if emp_df.empty:
-                                    error_messages.append(f"Bio ID {bio_id}: No records for selected month")
+                                # CRITICAL CHECK: Make sure emp_df is not empty
+                                if emp_df is None or emp_df.empty:
+                                    error_details.append(f"Employee {emp_id}: No data found for selected month")
                                     continue
                                 
-                                # Get employee mapping
-                                mapping = st.session_state.employee_mapping.get(
-                                    str(bio_id), 
-                                    {'employee_no': str(bio_id), 'name': f"EMPLOYEE {bio_id}"}
+                                # Check if it's a valid DataFrame
+                                if not isinstance(emp_df, pd.DataFrame):
+                                    error_details.append(f"Employee {emp_id}: Invalid data type")
+                                    continue
+                                
+                                # Check required columns
+                                required_cols = ['Day', 'Time']
+                                missing_cols = [col for col in required_cols if col not in emp_df.columns]
+                                if missing_cols:
+                                    error_details.append(f"Employee {emp_id}: Missing columns {missing_cols}")
+                                    continue
+                                
+                                # Get employee name
+                                emp_settings = st.session_state.employee_settings.get(
+                                    emp_id, 
+                                    {'name': f"EMPLOYEE {emp_id}", 'employee_no': emp_id}
                                 )
+                                emp_name = emp_settings['name']
                                 
-                                actual_emp_no = mapping['employee_no']
-                                emp_name = mapping['name']
+                                # DEBUG: Show what we're processing
+                                # st.write(f"Processing {emp_id}: {len(emp_df)} records")
                                 
-                                # Generate DTR
+                                # Generate DTR - WITH FIXED FUNCTION
                                 excel_file = generate_civil_service_dtr(
-                                    employee_no=actual_emp_no,  # Use actual employee number
+                                    employee_no=emp_id,  # Use biometric ID
                                     employee_name=emp_name,
                                     month=month_num,
                                     year=year_num,
-                                    attendance_data=emp_df,
+                                    attendance_data=emp_df,  # This is now guaranteed valid
                                     office_hours=st.session_state.office_hours
                                 )
                                 
                                 excel_files.append({
-                                    'employee_no': actual_emp_no,
+                                    'employee_no': emp_id,
                                     'employee_name': emp_name,
                                     'excel_file': excel_file
                                 })
@@ -718,18 +745,18 @@ if st.session_state.raw_data is not None:
                                 success_count += 1
                                 
                             except Exception as e:
-                                error_messages.append(f"Bio ID {bio_id}: {str(e)[:100]}")
+                                error_details.append(f"Employee {emp_id}: {str(e)[:100]}")
                                 continue
                         
                         # Show results
                         if excel_files:
                             st.success(f"✅ Successfully generated {success_count} DTR files!")
                             
-                            if error_messages:
-                                st.warning(f"⚠️ {len(error_messages)} issues occurred")
+                            if error_details:
+                                st.warning(f"⚠️ {len(error_details)} issues occurred")
                                 with st.expander("Show Details"):
-                                    for msg in error_messages:
-                                        st.write(msg)
+                                    for error in error_details:
+                                        st.write(error)
                             
                             # Create ZIP
                             zip_buffer = create_zip_file(excel_files, month_name, year_num)
@@ -749,8 +776,9 @@ if st.session_state.raw_data is not None:
                             with col2:
                                 with st.expander("📥 Download Individual Files"):
                                     for file_info in excel_files:
+                                        short_name = file_info['employee_name'][:25] + "..." if len(file_info['employee_name']) > 25 else file_info['employee_name']
                                         st.download_button(
-                                            label=f"⬇️ {file_info['employee_name'][:25]}",
+                                            label=f"⬇️ {short_name}",
                                             data=file_info['excel_file'],
                                             file_name=f"DTR_{file_info['employee_name']}_{month_name}_{year_num}.xlsx",
                                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -758,10 +786,18 @@ if st.session_state.raw_data is not None:
                         else:
                             st.error("❌ No files were generated.")
                             
-                            if error_messages:
+                            if error_details:
                                 with st.expander("Error Details"):
-                                    for msg in error_messages:
-                                        st.write(msg)
+                                    st.write("**Possible issues:**")
+                                    for error in error_details:
+                                        st.write(f"- {error}")
+                                    
+                                    # Debug info
+                                    st.write("\n**Debug Information:**")
+                                    st.write(f"Employees in month: {employees_in_month}")
+                                    st.write(f"Month dataframe shape: {month_df.shape}")
+                                    st.write(f"Sample of month dataframe:")
+                                    st.write(month_df.head())
             else:
                 st.warning(f"No data found for {month_name} {year_num}")
     else:
@@ -772,7 +808,7 @@ st.markdown("---")
 st.markdown(
     """
     <div style="text-align: center; color: gray;">
-    <p>Civil Service Form No. 48 DTR Generator | Version 6.0 - Fixed Employee Mapping</p>
+    <p>Civil Service Form No. 48 DTR Generator | Version 7.0 - Ultimate Fix</p>
     <p><small>Manual National High School - Division of Davao del Sur</small></p>
     </div>
     """,
