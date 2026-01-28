@@ -4,12 +4,479 @@ import numpy as np
 from datetime import datetime, timedelta
 import calendar
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill, Protection
 from openpyxl.utils import get_column_letter
 import io
 import base64
 import os
 from pathlib import Path
+import zipfile
+
+# =============================================
+# CIVIL SERVICE FORM NO. 48 GENERATOR FUNCTION
+# =============================================
+
+def generate_civil_service_dtr(employee_no, employee_name, month, year, attendance_data, office_hours):
+    """Generate Civil Service Form No. 48 in Excel format"""
+    
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"DTR {employee_name}"
+    
+    # Styles
+    title_font = Font(name='Arial', size=14, bold=True)
+    header_font = Font(name='Arial', size=11, bold=True)
+    normal_font = Font(name='Arial', size=10)
+    small_font = Font(name='Arial', size=9)
+    
+    center_align = Alignment(horizontal='center', vertical='center')
+    left_align = Alignment(horizontal='left', vertical='center')
+    
+    thin_border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # ========== HEADER SECTION ==========
+    # Republic of the Philippines
+    ws.merge_cells('A1:G1')
+    ws['A1'] = "REPUBLIC OF THE PHILIPPINES"
+    ws['A1'].font = header_font
+    ws['A1'].alignment = center_align
+    
+    # Department of Education
+    ws.merge_cells('A2:G2')
+    ws['A2'] = "Department of Education"
+    ws['A2'].font = header_font
+    ws['A2'].alignment = center_align
+    
+    # Division
+    ws.merge_cells('A3:G3')
+    ws['A3'] = "Division of Davao del Sur"
+    ws['A3'].font = header_font
+    ws['A3'].alignment = center_align
+    
+    # School
+    ws.merge_cells('A4:G4')
+    ws['A4'] = "Manual National High School"
+    ws['A4'].font = header_font
+    ws['A4'].alignment = center_align
+    
+    # Civil Service Form No. 48
+    ws.merge_cells('A6:G6')
+    ws['A6'] = "Civil Service Form No. 48"
+    ws['A6'].font = small_font
+    ws['A6'].alignment = center_align
+    
+    # Employee No.
+    ws.merge_cells('A7:G7')
+    ws['A7'] = f"Employee No. {employee_no}"
+    ws['A7'].font = small_font
+    ws['A7'].alignment = center_align
+    
+    # DAILY TIME RECORD Title
+    ws.merge_cells('A9:G9')
+    ws['A9'] = "DAILY TIME RECORD"
+    ws['A9'].font = title_font
+    ws['A9'].alignment = center_align
+    
+    # Separator line
+    ws.merge_cells('A10:G10')
+    ws['A10'] = "-------------------------o0o-------------------------"
+    ws['A10'].alignment = center_align
+    
+    # Employee Name
+    ws.merge_cells('A12:G12')
+    ws['A12'] = employee_name.upper()
+    ws['A12'].font = Font(name='Arial', size=12, bold=True)
+    ws['A12'].alignment = center_align
+    
+    # (Name) label
+    ws.merge_cells('A13:G13')
+    ws['A13'] = "(Name)"
+    ws['A13'].font = small_font
+    ws['A13'].alignment = center_align
+    
+    # ========== MONTH AND OFFICE HOURS SECTION ==========
+    current_row = 15
+    
+    # Month and Year
+    month_name = calendar.month_name[month]
+    ws.merge_cells(f'A{current_row}:C{current_row}')
+    ws[f'A{current_row}'] = f"{month_name.upper()} {year}"
+    ws[f'A{current_row}'].font = Font(name='Arial', size=11, bold=True)
+    ws[f'A{current_row}'].alignment = center_align
+    
+    ws.merge_cells(f'E{current_row}:G{current_row}')
+    ws[f'E{current_row}'] = f"For the month of"
+    ws[f'E{current_row}'].font = small_font
+    ws[f'E{current_row}'].alignment = left_align
+    
+    current_row += 1
+    
+    # Office Hours
+    am_hours = f"{office_hours['regular_am_in']} -- {office_hours['regular_am_out']}"
+    pm_hours = f"{office_hours['regular_pm_in']} -- {office_hours['regular_pm_out']}"
+    
+    ws.merge_cells(f'A{current_row}:C{current_row}')
+    ws[f'A{current_row}'] = am_hours
+    ws[f'A{current_row}'].font = normal_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    ws.merge_cells(f'E{current_row}:F{current_row}')
+    ws[f'E{current_row}'] = "Official hours for arrival and departure"
+    ws[f'E{current_row}'].font = small_font
+    ws[f'E{current_row}'].alignment = left_align
+    
+    ws[f'G{current_row}'] = "Regular days"
+    ws[f'G{current_row}'].font = small_font
+    ws[f'G{current_row}'].alignment = left_align
+    
+    current_row += 1
+    
+    ws.merge_cells(f'A{current_row}:C{current_row}')
+    ws[f'A{current_row}'] = pm_hours
+    ws[f'A{current_row}'].font = normal_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    ws.merge_cells(f'E{current_row}:F{current_row}')
+    ws[f'E{current_row}'] = ""
+    
+    ws[f'G{current_row}'] = "Saturdays"
+    ws[f'G{current_row}'].font = small_font
+    ws[f'G{current_row}'].alignment = left_align
+    
+    current_row += 1
+    
+    ws.merge_cells(f'A{current_row}:C{current_row}')
+    ws[f'A{current_row}'] = office_hours['saturday']
+    ws[f'A{current_row}'].font = normal_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    current_row += 2  # Add spacing
+    
+    # ========== DTR TABLE HEADER ==========
+    # Table header row
+    ws.merge_cells(f'A{current_row}:A{current_row+1}')  # Day
+    ws[f'A{current_row}'] = "Day"
+    ws[f'A{current_row}'].font = header_font
+    ws[f'A{current_row}'].alignment = center_align
+    ws[f'A{current_row}'].border = thin_border
+    
+    ws.merge_cells(f'B{current_row}:C{current_row}')  # A.M.
+    ws[f'B{current_row}'] = "A.M."
+    ws[f'B{current_row}'].font = header_font
+    ws[f'B{current_row}'].alignment = center_align
+    ws[f'B{current_row}'].border = thin_border
+    
+    ws.merge_cells(f'D{current_row}:E{current_row}')  # P.M.
+    ws[f'D{current_row}'] = "P.M."
+    ws[f'D{current_row}'].font = header_font
+    ws[f'D{current_row}'].alignment = center_align
+    ws[f'D{current_row}'].border = thin_border
+    
+    ws.merge_cells(f'F{current_row}:G{current_row}')  # Undertime
+    ws[f'F{current_row}'] = "Undertime"
+    ws[f'F{current_row}'].font = header_font
+    ws[f'F{current_row}'].alignment = center_align
+    ws[f'F{current_row}'].border = thin_border
+    
+    current_row += 1
+    
+    # Subheaders
+    subheader_cols = ['B', 'C', 'D', 'E', 'F', 'G']
+    subheader_texts = ['Arrival', 'Departure', 'Arrival', 'Departure', 'Hours', 'Minutes']
+    
+    for col, text in zip(subheader_cols, subheader_texts):
+        ws[f'{col}{current_row}'] = text
+        ws[f'{col}{current_row}'].font = small_font
+        ws[f'{col}{current_row}'].alignment = center_align
+        ws[f'{col}{current_row}'].border = thin_border
+    
+    current_row += 1
+    
+    # ========== DTR TABLE DATA ==========
+    # Get days in month
+    days_in_month = calendar.monthrange(year, month)[1]
+    
+    # Process attendance data by day
+    attendance_by_day = {}
+    for _, row in attendance_data.iterrows():
+        day = row['Day']
+        time_str = row['Time'].strftime('%H:%M')
+        
+        if day not in attendance_by_day:
+            attendance_by_day[day] = []
+        attendance_by_day[day].append(time_str)
+    
+    total_undertime_hours = 0
+    total_undertime_minutes = 0
+    
+    # Fill table for each day
+    for day in range(1, days_in_month + 1):
+        # Get day of week
+        date_obj = datetime(year, month, day)
+        day_name = date_obj.strftime('%A')
+        
+        # Day cell
+        ws[f'A{current_row}'] = str(day)
+        ws[f'A{current_row}'].font = Font(name='Arial', size=10, bold=True)
+        ws[f'A{current_row}'].alignment = center_align
+        ws[f'A{current_row}'].border = thin_border
+        
+        # Check if Saturday or Sunday
+        if day_name.upper() == 'SATURDAY':
+            ws.merge_cells(f'B{current_row}:C{current_row}')
+            ws[f'B{current_row}'] = "SATURDAY"
+            ws[f'B{current_row}'].font = Font(name='Arial', size=10, bold=True, italic=True)
+            ws[f'B{current_row}'].alignment = center_align
+            ws[f'B{current_row}'].border = thin_border
+            ws[f'B{current_row}'].fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
+            
+            # Clear other cells
+            for col in ['D', 'E', 'F', 'G']:
+                ws[f'{col}{current_row}'].border = thin_border
+        
+        elif day_name.upper() == 'SUNDAY':
+            ws.merge_cells(f'B{current_row}:C{current_row}')
+            ws[f'B{current_row}'] = "SUNDAY"
+            ws[f'B{current_row}'].font = Font(name='Arial', size=10, bold=True, italic=True)
+            ws[f'B{current_row}'].alignment = center_align
+            ws[f'B{current_row}'].border = thin_border
+            ws[f'B{current_row}'].fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
+            
+            # Clear other cells
+            for col in ['D', 'E', 'F', 'G']:
+                ws[f'{col}{current_row}'].border = thin_border
+        
+        else:
+            # Regular work day - fill with attendance data
+            if day in attendance_by_day:
+                times = sorted(attendance_by_day[day])
+                
+                # AM Arrival (first time before 12:00)
+                am_times = [t for t in times if int(t.split(':')[0]) < 12]
+                if am_times:
+                    ws[f'B{current_row}'] = am_times[0]  # First AM time
+                else:
+                    ws[f'B{current_row}'] = ""
+                
+                # AM Departure (last time before 12:00)
+                if am_times:
+                    ws[f'C{current_row}'] = am_times[-1]  # Last AM time
+                else:
+                    ws[f'C{current_row}'] = ""
+                
+                # PM Arrival (first time 12:00 or after)
+                pm_times = [t for t in times if int(t.split(':')[0]) >= 12]
+                if pm_times:
+                    ws[f'D{current_row}'] = pm_times[0]  # First PM time
+                else:
+                    ws[f'D{current_row}'] = ""
+                
+                # PM Departure (last time 12:00 or after)
+                if pm_times:
+                    ws[f'E{current_row}'] = pm_times[-1]  # Last PM time
+                else:
+                    ws[f'E{current_row}'] = ""
+                
+                # Calculate undertime
+                undertime_hours, undertime_minutes = calculate_undertime(
+                    am_in=ws[f'B{current_row}'].value,
+                    am_out=ws[f'C{current_row}'].value,
+                    pm_in=ws[f'D{current_row}'].value,
+                    pm_out=ws[f'E{current_row}'].value,
+                    office_hours=office_hours
+                )
+                
+                ws[f'F{current_row}'] = undertime_hours if undertime_hours else ""
+                ws[f'G{current_row}'] = undertime_minutes if undertime_minutes else ""
+                
+                if undertime_hours:
+                    total_undertime_hours += undertime_hours
+                if undertime_minutes:
+                    total_undertime_minutes += undertime_minutes
+                
+            else:
+                # No data for this day
+                for col in ['B', 'C', 'D', 'E', 'F', 'G']:
+                    ws[f'{col}{current_row}'] = ""
+            
+            # Format cells
+            for col in ['B', 'C', 'D', 'E']:
+                cell = ws[f'{col}{current_row}']
+                cell.font = Font(name='Arial', size=10, bold=True)
+                cell.alignment = center_align
+                cell.border = thin_border
+                # Lock these cells (time cells should not be editable)
+                cell.protection = Protection(locked=True)
+            
+            for col in ['F', 'G']:
+                cell = ws[f'{col}{current_row}']
+                cell.font = Font(name='Arial', size=10)
+                cell.alignment = center_align
+                cell.border = thin_border
+        
+        current_row += 1
+    
+    # ========== TOTAL UNDERTIME ROW ==========
+    ws.merge_cells(f'A{current_row}:E{current_row}')
+    ws[f'A{current_row}'] = "TOTAL"
+    ws[f'A{current_row}'].font = Font(name='Arial', size=10, bold=True)
+    ws[f'A{current_row}'].alignment = center_align
+    ws[f'A{current_row}'].border = thin_border
+    
+    ws[f'F{current_row}'] = total_undertime_hours if total_undertime_hours else ""
+    ws[f'F{current_row}'].font = Font(name='Arial', size=10, bold=True)
+    ws[f'F{current_row}'].alignment = center_align
+    ws[f'F{current_row}'].border = thin_border
+    
+    ws[f'G{current_row}'] = total_undertime_minutes if total_undertime_minutes else ""
+    ws[f'G{current_row}'].font = Font(name='Arial', size=10, bold=True)
+    ws[f'G{current_row}'].alignment = center_align
+    ws[f'G{current_row}'].border = thin_border
+    
+    current_row += 2
+    
+    # ========== CERTIFICATION SECTION ==========
+    ws.merge_cells(f'A{current_row}:G{current_row}')
+    ws[f'A{current_row}'] = "I certify on my honor that the above is a true and correct report of the"
+    ws[f'A{current_row}'].font = small_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    current_row += 1
+    
+    ws.merge_cells(f'A{current_row}:G{current_row}')
+    ws[f'A{current_row}'] = "hours of work performed, record of which was made daily at the time of"
+    ws[f'A{current_row}'].font = small_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    current_row += 1
+    
+    ws.merge_cells(f'A{current_row}:G{current_row}')
+    ws[f'A{current_row}'] = "arrival and departure from office."
+    ws[f'A{current_row}'].font = small_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    current_row += 2
+    
+    # Signature lines
+    ws.merge_cells(f'A{current_row}:C{current_row}')
+    ws[f'A{current_row}'] = "_________________________________"
+    ws[f'A{current_row}'].font = small_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    ws.merge_cells(f'E{current_row}:G{current_row}')
+    ws[f'E{current_row}'] = "_________________________________"
+    ws[f'E{current_row}'].font = small_font
+    ws[f'E{current_row}'].alignment = center_align
+    
+    current_row += 1
+    
+    ws.merge_cells(f'A{current_row}:C{current_row}')
+    ws[f'A{current_row}'] = "Signature of Employee"
+    ws[f'A{current_row}'].font = small_font
+    ws[f'A{current_row}'].alignment = center_align
+    
+    ws.merge_cells(f'E{current_row}:G{current_row}')
+    ws[f'E{current_row}'] = "Principal III"
+    ws[f'E{current_row}'].font = small_font
+    ws[f'E{current_row}'].alignment = center_align
+    
+    current_row += 1
+    
+    ws.merge_cells(f'A{current_row}:C{current_row}')
+    ws[f'A{current_row}'] = ""
+    
+    ws.merge_cells(f'E{current_row}:G{current_row}')
+    ws[f'E{current_row}'] = "VERIFIED as to the prescribed office hours:"
+    ws[f'E{current_row}'].font = small_font
+    ws[f'E{current_row}'].alignment = center_align
+    
+    # ========== ADJUST COLUMN WIDTHS ==========
+    column_widths = {
+        'A': 5,    # Day
+        'B': 10,   # AM Arrival
+        'C': 10,   # AM Departure
+        'D': 10,   # PM Arrival
+        'E': 10,   # PM Departure
+        'F': 8,    # Undertime Hours
+        'G': 8,    # Undertime Minutes
+    }
+    
+    for col, width in column_widths.items():
+        ws.column_dimensions[col].width = width
+    
+    # Protect the worksheet (except employee name and signature)
+    ws.protection.sheet = True
+    ws.protection.password = None  # No password, but prevents editing of time cells
+    
+    # Save to buffer
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    
+    return buffer
+
+def calculate_undertime(am_in, am_out, pm_in, pm_out, office_hours):
+    """Calculate undertime based on office hours"""
+    
+    # If any time is missing, return 0
+    if not am_in or not am_out or not pm_in or not pm_out:
+        return 0, 0
+    
+    try:
+        # Parse times
+        am_in_time = datetime.strptime(am_in, '%H:%M')
+        am_out_time = datetime.strptime(am_out, '%H:%M')
+        pm_in_time = datetime.strptime(pm_in, '%H:%M')
+        pm_out_time = datetime.strptime(pm_out, '%H:%M')
+        
+        # Parse office hours
+        office_am_in = datetime.strptime(office_hours['regular_am_in'], '%H:%M')
+        office_am_out = datetime.strptime(office_hours['regular_am_out'], '%H:%M')
+        office_pm_in = datetime.strptime(office_hours['regular_pm_in'], '%H:%M')
+        office_pm_out = datetime.strptime(office_hours['regular_pm_out'], '%H:%M')
+        
+        # Calculate expected hours
+        expected_am_hours = (office_am_out - office_am_in).seconds / 3600
+        expected_pm_hours = (office_pm_out - office_pm_in).seconds / 3600
+        total_expected_hours = expected_am_hours + expected_pm_hours
+        
+        # Calculate actual hours
+        actual_am_hours = (am_out_time - am_in_time).seconds / 3600 if am_out_time > am_in_time else 0
+        actual_pm_hours = (pm_out_time - pm_in_time).seconds / 3600 if pm_out_time > pm_in_time else 0
+        total_actual_hours = actual_am_hours + actual_pm_hours
+        
+        # Calculate undertime
+        undertime_hours_decimal = max(0, total_expected_hours - total_actual_hours)
+        undertime_hours = int(undertime_hours_decimal)
+        undertime_minutes = int((undertime_hours_decimal - undertime_hours) * 60)
+        
+        return undertime_hours, undertime_minutes
+    
+    except Exception as e:
+        return 0, 0
+
+def create_zip_file(excel_files, month, year):
+    """Create ZIP file containing all DTR files"""
+    
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for file_info in excel_files:
+            filename = f"DTR_{file_info['employee_name']}_{month}_{year}.xlsx"
+            zip_file.writestr(filename, file_info['excel_file'].getvalue())
+    
+    zip_buffer.seek(0)
+    return zip_buffer
+
+# =============================================
+# STREAMLIT APP STARTS HERE
+# =============================================
 
 # Page configuration
 st.set_page_config(
@@ -436,467 +903,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-# =============================================
-# CIVIL SERVICE FORM NO. 48 GENERATOR FUNCTION
-# =============================================
-
-def generate_civil_service_dtr(employee_no, employee_name, month, year, attendance_data, office_hours):
-    """Generate Civil Service Form No. 48 in Excel format"""
-    
-    # Create workbook
-    wb = Workbook()
-    ws = wb.active
-    ws.title = f"DTR {employee_name}"
-    
-    # Styles
-    title_font = Font(name='Arial', size=14, bold=True)
-    header_font = Font(name='Arial', size=11, bold=True)
-    normal_font = Font(name='Arial', size=10)
-    small_font = Font(name='Arial', size=9)
-    
-    center_align = Alignment(horizontal='center', vertical='center')
-    left_align = Alignment(horizontal='left', vertical='center')
-    
-    thin_border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-    
-    # ========== HEADER SECTION ==========
-    # Republic of the Philippines
-    ws.merge_cells('A1:G1')
-    ws['A1'] = "REPUBLIC OF THE PHILIPPINES"
-    ws['A1'].font = header_font
-    ws['A1'].alignment = center_align
-    
-    # Department of Education
-    ws.merge_cells('A2:G2')
-    ws['A2'] = "Department of Education"
-    ws['A2'].font = header_font
-    ws['A2'].alignment = center_align
-    
-    # Division
-    ws.merge_cells('A3:G3')
-    ws['A3'] = "Division of Davao del Sur"
-    ws['A3'].font = header_font
-    ws['A3'].alignment = center_align
-    
-    # School
-    ws.merge_cells('A4:G4')
-    ws['A4'] = "Manual National High School"
-    ws['A4'].font = header_font
-    ws['A4'].alignment = center_align
-    
-    # Civil Service Form No. 48
-    ws.merge_cells('A6:G6')
-    ws['A6'] = "Civil Service Form No. 48"
-    ws['A6'].font = small_font
-    ws['A6'].alignment = center_align
-    
-    # Employee No.
-    ws.merge_cells('A7:G7')
-    ws['A7'] = f"Employee No. {employee_no}"
-    ws['A7'].font = small_font
-    ws['A7'].alignment = center_align
-    
-    # DAILY TIME RECORD Title
-    ws.merge_cells('A9:G9')
-    ws['A9'] = "DAILY TIME RECORD"
-    ws['A9'].font = title_font
-    ws['A9'].alignment = center_align
-    
-    # Separator line
-    ws.merge_cells('A10:G10')
-    ws['A10'] = "-------------------------o0o-------------------------"
-    ws['A10'].alignment = center_align
-    
-    # Employee Name
-    ws.merge_cells('A12:G12')
-    ws['A12'] = employee_name.upper()
-    ws['A12'].font = Font(name='Arial', size=12, bold=True)
-    ws['A12'].alignment = center_align
-    
-    # (Name) label
-    ws.merge_cells('A13:G13')
-    ws['A13'] = "(Name)"
-    ws['A13'].font = small_font
-    ws['A13'].alignment = center_align
-    
-    # ========== MONTH AND OFFICE HOURS SECTION ==========
-    current_row = 15
-    
-    # Month and Year
-    month_name = calendar.month_name[month]
-    ws.merge_cells(f'A{current_row}:C{current_row}')
-    ws[f'A{current_row}'] = f"{month_name.upper()} {year}"
-    ws[f'A{current_row}'].font = Font(name='Arial', size=11, bold=True)
-    ws[f'A{current_row}'].alignment = center_align
-    
-    ws.merge_cells(f'E{current_row}:G{current_row}')
-    ws[f'E{current_row}'] = f"For the month of"
-    ws[f'E{current_row}'].font = small_font
-    ws[f'E{current_row}'].alignment = left_align
-    
-    current_row += 1
-    
-    # Office Hours
-    am_hours = f"{office_hours['regular_am_in']} -- {office_hours['regular_am_out']}"
-    pm_hours = f"{office_hours['regular_pm_in']} -- {office_hours['regular_pm_out']}"
-    
-    ws.merge_cells(f'A{current_row}:C{current_row}')
-    ws[f'A{current_row}'] = am_hours
-    ws[f'A{current_row}'].font = normal_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    ws.merge_cells(f'E{current_row}:F{current_row}')
-    ws[f'E{current_row}'] = "Official hours for arrival and departure"
-    ws[f'E{current_row}'].font = small_font
-    ws[f'E{current_row}'].alignment = left_align
-    
-    ws[f'G{current_row}'] = "Regular days"
-    ws[f'G{current_row}'].font = small_font
-    ws[f'G{current_row}'].alignment = left_align
-    
-    current_row += 1
-    
-    ws.merge_cells(f'A{current_row}:C{current_row}')
-    ws[f'A{current_row}'] = pm_hours
-    ws[f'A{current_row}'].font = normal_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    ws.merge_cells(f'E{current_row}:F{current_row}')
-    ws[f'E{current_row}'] = ""
-    
-    ws[f'G{current_row}'] = "Saturdays"
-    ws[f'G{current_row}'].font = small_font
-    ws[f'G{current_row}'].alignment = left_align
-    
-    current_row += 1
-    
-    ws.merge_cells(f'A{current_row}:C{current_row}')
-    ws[f'A{current_row}'] = office_hours['saturday']
-    ws[f'A{current_row}'].font = normal_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    current_row += 2  # Add spacing
-    
-    # ========== DTR TABLE HEADER ==========
-    # Table header row
-    headers = ["Day", "A.M.", "", "P.M.", "", "", "Undertime", ""]
-    subheaders = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
-    
-    ws.merge_cells(f'A{current_row}:A{current_row+1}')  # Day
-    ws[f'A{current_row}'] = "Day"
-    ws[f'A{current_row}'].font = header_font
-    ws[f'A{current_row}'].alignment = center_align
-    ws[f'A{current_row}'].border = thin_border
-    
-    ws.merge_cells(f'B{current_row}:C{current_row}')  # A.M.
-    ws[f'B{current_row}'] = "A.M."
-    ws[f'B{current_row}'].font = header_font
-    ws[f'B{current_row}'].alignment = center_align
-    ws[f'B{current_row}'].border = thin_border
-    
-    ws.merge_cells(f'D{current_row}:E{current_row}')  # P.M.
-    ws[f'D{current_row}'] = "P.M."
-    ws[f'D{current_row}'].font = header_font
-    ws[f'D{current_row}'].alignment = center_align
-    ws[f'D{current_row}'].border = thin_border
-    
-    ws.merge_cells(f'F{current_row}:G{current_row}')  # Undertime
-    ws[f'F{current_row}'] = "Undertime"
-    ws[f'F{current_row}'].font = header_font
-    ws[f'F{current_row}'].alignment = center_align
-    ws[f'F{current_row}'].border = thin_border
-    
-    current_row += 1
-    
-    # Subheaders
-    subheader_cols = ['B', 'C', 'D', 'E', 'F', 'G']
-    subheader_texts = ['Arrival', 'Departure', 'Arrival', 'Departure', 'Hours', 'Minutes']
-    
-    for col, text in zip(subheader_cols, subheader_texts):
-        ws[f'{col}{current_row}'] = text
-        ws[f'{col}{current_row}'].font = small_font
-        ws[f'{col}{current_row}'].alignment = center_align
-        ws[f'{col}{current_row}'].border = thin_border
-    
-    current_row += 1
-    
-    # ========== DTR TABLE DATA ==========
-    # Get days in month
-    days_in_month = calendar.monthrange(year, month)[1]
-    
-    # Process attendance data by day
-    attendance_by_day = {}
-    for _, row in attendance_data.iterrows():
-        day = row['Day']
-        time_str = row['Time'].strftime('%H:%M')
-        
-        if day not in attendance_by_day:
-            attendance_by_day[day] = []
-        attendance_by_day[day].append(time_str)
-    
-    total_undertime_hours = 0
-    total_undertime_minutes = 0
-    
-    # Fill table for each day
-    for day in range(1, days_in_month + 1):
-        # Get day of week
-        date_obj = datetime(year, month, day)
-        day_name = date_obj.strftime('%A')
-        
-        # Day cell
-        ws[f'A{current_row}'] = str(day)
-        ws[f'A{current_row}'].font = Font(name='Arial', size=10, bold=True)
-        ws[f'A{current_row}'].alignment = center_align
-        ws[f'A{current_row}'].border = thin_border
-        
-        # Check if Saturday or Sunday
-        if day_name.upper() == 'SATURDAY':
-            ws.merge_cells(f'B{current_row}:C{current_row}')
-            ws[f'B{current_row}'] = "SATURDAY"
-            ws[f'B{current_row}'].font = Font(name='Arial', size=10, bold=True, italic=True)
-            ws[f'B{current_row}'].alignment = center_align
-            ws[f'B{current_row}'].border = thin_border
-            ws[f'B{current_row}'].fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
-            
-            # Clear other cells
-            for col in ['D', 'E', 'F', 'G']:
-                ws[f'{col}{current_row}'].border = thin_border
-        
-        elif day_name.upper() == 'SUNDAY':
-            ws.merge_cells(f'B{current_row}:C{current_row}')
-            ws[f'B{current_row}'] = "SUNDAY"
-            ws[f'B{current_row}'].font = Font(name='Arial', size=10, bold=True, italic=True)
-            ws[f'B{current_row}'].alignment = center_align
-            ws[f'B{current_row}'].border = thin_border
-            ws[f'B{current_row}'].fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
-            
-            # Clear other cells
-            for col in ['D', 'E', 'F', 'G']:
-                ws[f'{col}{current_row}'].border = thin_border
-        
-        else:
-            # Regular work day - fill with attendance data
-            if day in attendance_by_day:
-                times = sorted(attendance_by_day[day])
-                
-                # AM Arrival (first time before 12:00)
-                am_times = [t for t in times if int(t.split(':')[0]) < 12]
-                if am_times:
-                    ws[f'B{current_row}'] = am_times[0]  # First AM time
-                else:
-                    ws[f'B{current_row}'] = ""
-                
-                # AM Departure (last time before 12:00)
-                if am_times:
-                    ws[f'C{current_row}'] = am_times[-1]  # Last AM time
-                else:
-                    ws[f'C{current_row}'] = ""
-                
-                # PM Arrival (first time 12:00 or after)
-                pm_times = [t for t in times if int(t.split(':')[0]) >= 12]
-                if pm_times:
-                    ws[f'D{current_row}'] = pm_times[0]  # First PM time
-                else:
-                    ws[f'D{current_row}'] = ""
-                
-                # PM Departure (last time 12:00 or after)
-                if pm_times:
-                    ws[f'E{current_row}'] = pm_times[-1]  # Last PM time
-                else:
-                    ws[f'E{current_row}'] = ""
-                
-                # Calculate undertime
-                undertime_hours, undertime_minutes = calculate_undertime(
-                    am_in=ws[f'B{current_row}'].value,
-                    am_out=ws[f'C{current_row}'].value,
-                    pm_in=ws[f'D{current_row}'].value,
-                    pm_out=ws[f'E{current_row}'].value,
-                    office_hours=office_hours
-                )
-                
-                ws[f'F{current_row}'] = undertime_hours
-                ws[f'G{current_row}'] = undertime_minutes
-                
-                total_undertime_hours += undertime_hours
-                total_undertime_minutes += undertime_minutes
-                
-            else:
-                # No data for this day
-                for col in ['B', 'C', 'D', 'E', 'F', 'G']:
-                    ws[f'{col}{current_row}'] = ""
-            
-            # Format cells
-            for col in ['B', 'C', 'D', 'E']:
-                cell = ws[f'{col}{current_row}']
-                cell.font = Font(name='Arial', size=10, bold=True)
-                cell.alignment = center_align
-                cell.border = thin_border
-                # Lock these cells (time cells should not be editable)
-                cell.protection = Protection(locked=True)
-            
-            for col in ['F', 'G']:
-                cell = ws[f'{col}{current_row}']
-                cell.font = Font(name='Arial', size=10)
-                cell.alignment = center_align
-                cell.border = thin_border
-        
-        current_row += 1
-    
-    # ========== TOTAL UNDERTIME ROW ==========
-    ws.merge_cells(f'A{current_row}:E{current_row}')
-    ws[f'A{current_row}'] = "TOTAL"
-    ws[f'A{current_row}'].font = Font(name='Arial', size=10, bold=True)
-    ws[f'A{current_row}'].alignment = center_align
-    ws[f'A{current_row}'].border = thin_border
-    
-    ws[f'F{current_row}'] = total_undertime_hours
-    ws[f'F{current_row}'].font = Font(name='Arial', size=10, bold=True)
-    ws[f'F{current_row}'].alignment = center_align
-    ws[f'F{current_row}'].border = thin_border
-    
-    ws[f'G{current_row}'] = total_undertime_minutes
-    ws[f'G{current_row}'].font = Font(name='Arial', size=10, bold=True)
-    ws[f'G{current_row}'].alignment = center_align
-    ws[f'G{current_row}'].border = thin_border
-    
-    current_row += 2
-    
-    # ========== CERTIFICATION SECTION ==========
-    ws.merge_cells(f'A{current_row}:G{current_row}')
-    ws[f'A{current_row}'] = "I certify on my honor that the above is a true and correct report of the"
-    ws[f'A{current_row}'].font = small_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    current_row += 1
-    
-    ws.merge_cells(f'A{current_row}:G{current_row}')
-    ws[f'A{current_row}'] = "hours of work performed, record of which was made daily at the time of"
-    ws[f'A{current_row}'].font = small_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    current_row += 1
-    
-    ws.merge_cells(f'A{current_row}:G{current_row}')
-    ws[f'A{current_row}'] = "arrival and departure from office."
-    ws[f'A{current_row}'].font = small_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    current_row += 2
-    
-    # Signature lines
-    ws.merge_cells(f'A{current_row}:C{current_row}')
-    ws[f'A{current_row}'] = "_________________________________"
-    ws[f'A{current_row}'].font = small_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    ws.merge_cells(f'E{current_row}:G{current_row}')
-    ws[f'E{current_row}'] = "_________________________________"
-    ws[f'E{current_row}'].font = small_font
-    ws[f'E{current_row}'].alignment = center_align
-    
-    current_row += 1
-    
-    ws.merge_cells(f'A{current_row}:C{current_row}')
-    ws[f'A{current_row}'] = "Signature of Employee"
-    ws[f'A{current_row}'].font = small_font
-    ws[f'A{current_row}'].alignment = center_align
-    
-    ws.merge_cells(f'E{current_row}:G{current_row}')
-    ws[f'E{current_row}'] = "Principal III"
-    ws[f'E{current_row}'].font = small_font
-    ws[f'E{current_row}'].alignment = center_align
-    
-    current_row += 1
-    
-    ws.merge_cells(f'A{current_row}:C{current_row}')
-    ws[f'A{current_row}'] = ""
-    
-    ws.merge_cells(f'E{current_row}:G{current_row}')
-    ws[f'E{current_row}'] = "VERIFIED as to the prescribed office hours:"
-    ws[f'E{current_row}'].font = small_font
-    ws[f'E{current_row}'].alignment = center_align
-    
-    # ========== ADJUST COLUMN WIDTHS ==========
-    column_widths = {
-        'A': 5,    # Day
-        'B': 10,   # AM Arrival
-        'C': 10,   # AM Departure
-        'D': 10,   # PM Arrival
-        'E': 10,   # PM Departure
-        'F': 8,    # Undertime Hours
-        'G': 8,    # Undertime Minutes
-    }
-    
-    for col, width in column_widths.items():
-        ws.column_dimensions[col].width = width
-    
-    # Protect the worksheet (except employee name and signature)
-    ws.protection.sheet = True
-    ws.protection.password = None  # No password, but prevents editing of time cells
-    
-    # Save to buffer
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    
-    return buffer
-
-def calculate_undertime(am_in, am_out, pm_in, pm_out, office_hours):
-    """Calculate undertime based on office hours"""
-    
-    # If any time is missing, return 0
-    if not all([am_in, am_out, pm_in, pm_out]):
-        return 0, 0
-    
-    try:
-        # Parse times
-        am_in_time = datetime.strptime(am_in, '%H:%M')
-        am_out_time = datetime.strptime(am_out, '%H:%M')
-        pm_in_time = datetime.strptime(pm_in, '%H:%M')
-        pm_out_time = datetime.strptime(pm_out, '%H:%M')
-        
-        # Parse office hours
-        office_am_in = datetime.strptime(office_hours['regular_am_in'], '%H:%M')
-        office_am_out = datetime.strptime(office_hours['regular_am_out'], '%H:%M')
-        office_pm_in = datetime.strptime(office_hours['regular_pm_in'], '%H:%M')
-        office_pm_out = datetime.strptime(office_hours['regular_pm_out'], '%H:%M')
-        
-        # Calculate expected hours
-        expected_am_hours = (office_am_out - office_am_in).seconds / 3600
-        expected_pm_hours = (office_pm_out - office_pm_in).seconds / 3600
-        total_expected_hours = expected_am_hours + expected_pm_hours
-        
-        # Calculate actual hours
-        actual_am_hours = (am_out_time - am_in_time).seconds / 3600 if am_out_time > am_in_time else 0
-        actual_pm_hours = (pm_out_time - pm_in_time).seconds / 3600 if pm_out_time > pm_in_time else 0
-        total_actual_hours = actual_am_hours + actual_pm_hours
-        
-        # Calculate undertime
-        undertime_hours_decimal = max(0, total_expected_hours - total_actual_hours)
-        undertime_hours = int(undertime_hours_decimal)
-        undertime_minutes = int((undertime_hours_decimal - undertime_hours) * 60)
-        
-        return undertime_hours, undertime_minutes
-    
-    except:
-        return 0, 0
-
-def create_zip_file(excel_files, month, year):
-    """Create ZIP file containing all DTR files"""
-    import zipfile
-    
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        for file_info in excel_files:
-            filename = f"DTR_{file_info['employee_name']}_{month}_{year}.xlsx"
-            zip_file.writestr(filename, file_info['excel_file'].getvalue())
-    
-    zip_buffer.seek(0)
-    return zip_buffer
