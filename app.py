@@ -202,21 +202,34 @@ def generate_civil_service_dtr(employee_no, employee_name, month, year, attendan
     # Get days in month
     days_in_month = calendar.monthrange(year, month)[1]
     
-    # Process attendance data by day
+    # Process attendance data by day - WITH ERROR HANDLING
     attendance_by_day = {}
-    for _, row in attendance_data.iterrows():
-        day = row['Day']
-        # Handle Time column - it might be datetime.time or string
-        time_val = row['Time']
-        if hasattr(time_val, 'strftime'):
-            time_str = time_val.strftime('%H:%M')
-        else:
-            # If it's already a string
-            time_str = str(time_val)
-        
-        if day not in attendance_by_day:
-            attendance_by_day[day] = []
-        attendance_by_day[day].append(time_str)
+    
+    # Check if attendance_data is valid
+    if attendance_data is not None and not attendance_data.empty:
+        try:
+            for _, row in attendance_data.iterrows():
+                # Check if 'Day' column exists
+                if 'Day' in row:
+                    day = int(row['Day']) if not pd.isna(row['Day']) else 0
+                    
+                    # Check if 'Time' column exists
+                    if 'Time' in row and not pd.isna(row['Time']):
+                        time_val = row['Time']
+                        if hasattr(time_val, 'strftime'):
+                            time_str = time_val.strftime('%H:%M')
+                        elif isinstance(time_val, str):
+                            time_str = time_val
+                        else:
+                            time_str = str(time_val)
+                        
+                        if day > 0:
+                            if day not in attendance_by_day:
+                                attendance_by_day[day] = []
+                            attendance_by_day[day].append(time_str)
+        except Exception as e:
+            # If there's an error, continue with empty attendance data
+            print(f"Warning: Error processing attendance data: {e}")
     
     total_undertime_hours = 0
     total_undertime_minutes = 0
@@ -499,18 +512,17 @@ def create_zip_file(excel_files, month, year):
     return zip_buffer
 
 # =============================================
-# STREAMLIT APP STARTS HERE
+# STREAMLIT APP STARTS HERE - SIMPLIFIED VERSION
 # =============================================
 
 # Page configuration
 st.set_page_config(
     page_title="Civil Service Form No. 48 DTR Generator",
     page_icon="📋",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Custom CSS
+# Custom CSS - Simple
 st.markdown("""
 <style>
     .main-header {
@@ -519,35 +531,22 @@ st.markdown("""
         text-align: center;
         margin-bottom: 1rem;
     }
-    .cs-form {
-        background-color: #F3F4F6;
-        padding: 2rem;
-        border-radius: 10px;
-        border: 2px solid #1E3A8A;
+    .error-box {
+        background-color: #FEE2E2;
+        padding: 1rem;
+        border-radius: 5px;
+        border-left: 4px solid #DC2626;
         margin: 1rem 0;
     }
-    .form-title {
-        text-align: center;
-        font-weight: bold;
-        color: #1E3A8A;
-        margin-bottom: 1rem;
-    }
-    .stButton>button {
-        width: 100%;
-    }
-    .employee-card {
-        background-color: #EFF6FF;
+    .success-box {
+        background-color: #D1FAE5;
         padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        border-left: 4px solid #1E3A8A;
+        border-radius: 5px;
+        border-left: 4px solid #10B981;
+        margin: 1rem 0;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# App title
-st.markdown('<h1 class="main-header">📋 Civil Service Form No. 48 - DTR Generator</h1>', unsafe_allow_html=True)
-st.markdown("Generate Daily Time Records from .dat files following DepEd format")
 
 # Initialize session state
 if 'dtr_data' not in st.session_state:
@@ -563,242 +562,212 @@ if 'office_hours' not in st.session_state:
         'saturday': 'AS REQUIRED'
     }
 
-# Sidebar for settings
-with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/3131/3131639.png", width=100)
-    st.title("⚙️ Settings")
-    
-    st.markdown("---")
-    
-    # Step 1: Upload DAT file
-    st.subheader("1. Upload Attendance Data")
+# App title
+st.markdown('<h1 class="main-header">📋 Civil Service Form No. 48 - DTR Generator</h1>', unsafe_allow_html=True)
+
+# Main layout
+col1, col2 = st.columns([3, 2])
+
+with col1:
+    # File Upload
+    st.subheader("📤 Upload Attendance Data")
     uploaded_file = st.file_uploader(
-        "Choose .dat file",
+        "Choose .dat or .txt file",
         type=['dat', 'txt', 'csv'],
         help="Upload your biometric attendance file"
     )
     
     if uploaded_file:
         try:
-            # Read the DAT file
+            # Read the file
             content = uploaded_file.getvalue().decode('utf-8')
-            first_line = content.split('\n')[0].strip()
+            lines = content.strip().split('\n')
             
-            if '\t' in first_line:
-                delimiter = '\t'
-            elif ',' in first_line:
-                delimiter = ','
-            else:
-                delimiter = ' '
+            # Parse data
+            data = []
+            for line in lines:
+                if line.strip():
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        emp_no = parts[0]
+                        date_time_str = ' '.join(parts[1:3]) if len(parts) >= 3 else parts[1]
+                        
+                        try:
+                            dt = datetime.strptime(date_time_str, '%Y-%m-%d %H:%M:%S')
+                            data.append({
+                                'EmployeeNo': emp_no,
+                                'DateTime': dt,
+                                'Date': dt.date(),
+                                'Time': dt.time(),
+                                'Month': dt.month,
+                                'Year': dt.year,
+                                'Day': dt.day
+                            })
+                        except:
+                            # Try different format
+                            try:
+                                dt = datetime.strptime(date_time_str, '%m/%d/%Y %H:%M:%S')
+                                data.append({
+                                    'EmployeeNo': emp_no,
+                                    'DateTime': dt,
+                                    'Date': dt.date(),
+                                    'Time': dt.time(),
+                                    'Month': dt.month,
+                                    'Year': dt.year,
+                                    'Day': dt.day
+                                })
+                            except:
+                                continue
             
-            uploaded_file.seek(0)
-            df = pd.read_csv(uploaded_file, header=None, delimiter=delimiter)
-            
-            # Check number of columns and assign names
-            if len(df.columns) >= 2:
-                df.columns = ['EmployeeNo', 'DateTime'] + [f'Col{i}' for i in range(2, len(df.columns))]
-                
-                # Convert DateTime
-                df['DateTime'] = pd.to_datetime(df['DateTime'], errors='coerce')
-                df = df.dropna(subset=['DateTime'])
-                
-                # Add date components
-                df['Date'] = df['DateTime'].dt.date
-                df['Time'] = df['DateTime'].dt.time
-                df['Month'] = df['DateTime'].dt.month
-                df['Year'] = df['DateTime'].dt.year
-                df['Day'] = df['DateTime'].dt.day
-                df['DayName'] = df['DateTime'].dt.day_name()
-                df['Hour'] = df['DateTime'].dt.hour
-                df['Minute'] = df['DateTime'].dt.minute
-                
-                # Convert EmployeeNo to string for consistency
-                df['EmployeeNo'] = df['EmployeeNo'].astype(str).str.strip()
-                
-                # Store in session state
+            if data:
+                df = pd.DataFrame(data)
                 st.session_state.raw_data = df
                 
+                st.markdown(f'<div class="success-box">✅ File loaded: {len(df)} records found</div>', unsafe_allow_html=True)
+                
                 # Show summary
-                st.success(f"✅ File loaded: {len(df)} records")
-                st.info(f"**Employees:** {df['EmployeeNo'].nunique()}")
-                st.info(f"**Date Range:** {df['Date'].min()} to {df['Date'].max()}")
-                
-                # Extract unique months and years
-                months_data = df[['Month', 'Year']].drop_duplicates().sort_values(['Year', 'Month'])
-                st.session_state.available_months = months_data.to_dict('records')
-                
+                with st.expander("📊 File Summary"):
+                    st.write(f"**Total Records:** {len(df)}")
+                    st.write(f"**Employees:** {df['EmployeeNo'].nunique()}")
+                    st.write(f"**Date Range:** {df['Date'].min()} to {df['Date'].max()}")
+                    st.write(f"**Months in data:** {sorted(df['Month'].unique())}")
+                    
+                    # Show sample
+                    st.write("**Sample Data:**")
+                    st.dataframe(df.head(10))
             else:
-                st.error("Invalid file format. Need at least 2 columns.")
+                st.error("No valid data found in the file")
                 
         except Exception as e:
             st.error(f"Error reading file: {str(e)}")
+
+with col2:
+    # Office Hours
+    st.subheader("⏰ Office Hours")
     
-    st.markdown("---")
-    
-    # Step 2: Office Hours Settings
-    st.subheader("2. Set Office Hours")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.office_hours['regular_am_in'] = st.text_input(
-            "AM Time In", 
-            value=st.session_state.office_hours['regular_am_in'],
-            help="e.g., 07:30"
-        )
-    with col2:
-        st.session_state.office_hours['regular_am_out'] = st.text_input(
-            "AM Time Out", 
-            value=st.session_state.office_hours['regular_am_out'],
-            help="e.g., 11:50"
-        )
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.session_state.office_hours['regular_pm_in'] = st.text_input(
-            "PM Time In", 
-            value=st.session_state.office_hours['regular_pm_in'],
-            help="e.g., 12:50"
-        )
-    with col2:
-        st.session_state.office_hours['regular_pm_out'] = st.text_input(
-            "PM Time Out", 
-            value=st.session_state.office_hours['regular_pm_out'],
-            help="e.g., 16:30"
-        )
-    
+    st.session_state.office_hours['regular_am_in'] = st.text_input(
+        "AM Time In", 
+        value=st.session_state.office_hours['regular_am_in']
+    )
+    st.session_state.office_hours['regular_am_out'] = st.text_input(
+        "AM Time Out", 
+        value=st.session_state.office_hours['regular_am_out']
+    )
+    st.session_state.office_hours['regular_pm_in'] = st.text_input(
+        "PM Time In", 
+        value=st.session_state.office_hours['regular_pm_in']
+    )
+    st.session_state.office_hours['regular_pm_out'] = st.text_input(
+        "PM Time Out", 
+        value=st.session_state.office_hours['regular_pm_out']
+    )
     st.session_state.office_hours['saturday'] = st.text_input(
         "Saturday Hours",
-        value=st.session_state.office_hours['saturday'],
-        help="Usually 'AS REQUIRED'"
+        value=st.session_state.office_hours['saturday']
     )
-    
-    st.markdown("---")
-    
-    # Step 3: Employee Settings
-    if 'raw_data' in st.session_state:
-        st.subheader("3. Employee Settings")
-        
-        employees = sorted(st.session_state.raw_data['EmployeeNo'].unique())
-        selected_employee = st.selectbox("Select Employee", employees, key="employee_selector")
-        
-        if selected_employee:
-            # Initialize employee settings if not exists
-            if selected_employee not in st.session_state.employee_settings:
-                st.session_state.employee_settings[selected_employee] = {
-                    'name': f"EMPLOYEE {selected_employee}",
-                    'employee_no': selected_employee
-                }
-            
-            # Employee name input
-            employee_name = st.text_input(
-                f"Full Name for Employee {selected_employee}",
-                value=st.session_state.employee_settings[selected_employee]['name'],
-                key=f"name_{selected_employee}"
-            )
-            
-            # Update session state
-            st.session_state.employee_settings[selected_employee]['name'] = employee_name
-            
-            # Quick update for all employees
-            st.markdown("---")
-            if st.button("🔄 Initialize All Employee Names", use_container_width=True):
-                for emp in employees:
-                    if emp not in st.session_state.employee_settings:
-                        st.session_state.employee_settings[emp] = {
-                            'name': f"EMPLOYEE {emp}",
-                            'employee_no': emp
-                        }
-                st.success(f"Initialized {len(employees)} employees")
 
-# Main Content
+# Main content area
 if 'raw_data' in st.session_state:
     df = st.session_state.raw_data
     
-    # Month Selection
     st.markdown("---")
+    
+    # Month Selection
     st.subheader("📅 Select Month for DTR")
     
-    # Create month-year options
-    month_options = []
-    for month_data in st.session_state.available_months:
-        month_num = month_data['Month']
-        year_num = month_data['Year']
-        month_name = calendar.month_name[month_num]
-        month_options.append(f"{month_name} {year_num}")
+    # Get unique months
+    unique_months = df[['Month', 'Year']].drop_duplicates().sort_values(['Year', 'Month'])
     
-    if month_options:
-        selected_period = st.selectbox("Choose Month", month_options, key="month_selector")
+    if not unique_months.empty:
+        month_options = []
+        for _, row in unique_months.iterrows():
+            month_name = calendar.month_name[row['Month']]
+            month_options.append(f"{month_name} {row['Year']}")
         
-        # Parse selected month and year
+        selected_period = st.selectbox("Choose Month", month_options)
+        
+        # Parse selection
         month_name, year_str = selected_period.split()
         month_num = list(calendar.month_name).index(month_name)
         year_num = int(year_str)
         
-        # Filter data for selected month
+        # Filter data
         month_df = df[(df['Month'] == month_num) & (df['Year'] == year_num)].copy()
         
         if not month_df.empty:
-            # Display summary
-            col1, col2, col3, col4 = st.columns(4)
+            # Summary
+            col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Month", f"{month_name} {year_num}")
+                st.metric("Employees in Month", month_df['EmployeeNo'].nunique())
             with col2:
                 st.metric("Total Records", len(month_df))
             with col3:
-                unique_emps = month_df['EmployeeNo'].nunique()
-                st.metric("Employees", unique_emps)
-            with col4:
-                days = month_df['Date'].nunique()
-                st.metric("Days with Data", days)
+                st.metric("Date Range", f"{month_df['Date'].min()} to {month_df['Date'].max()}")
+            
+            # Employee Management
+            st.subheader("👤 Employee Settings")
+            
+            # Initialize all employees
+            employees = sorted(month_df['EmployeeNo'].unique())
+            for emp in employees:
+                if emp not in st.session_state.employee_settings:
+                    st.session_state.employee_settings[emp] = {
+                        'name': f"EMPLOYEE {emp}",
+                        'employee_no': emp
+                    }
             
             # Show employee list
-            with st.expander("👥 Employee List for this Month"):
-                employees_in_month = sorted(month_df['EmployeeNo'].unique())
-                for emp in employees_in_month:
-                    emp_name = st.session_state.employee_settings.get(
-                        emp, 
-                        {'name': f"EMPLOYEE {emp}"}
-                    )['name']
-                    st.markdown(f"<div class='employee-card'><strong>{emp}</strong>: {emp_name}</div>", unsafe_allow_html=True)
+            with st.expander(f"Edit Employee Names ({len(employees)} employees)"):
+                for emp in employees:
+                    current_name = st.session_state.employee_settings[emp]['name']
+                    new_name = st.text_input(
+                        f"Employee {emp}",
+                        value=current_name,
+                        key=f"edit_{emp}"
+                    )
+                    if new_name != current_name:
+                        st.session_state.employee_settings[emp]['name'] = new_name
             
             # Generate DTR Button
             st.markdown("---")
             st.subheader("🔄 Generate DTR Files")
             
-            if st.button("📋 Generate Civil Service Form No. 48", type="primary", use_container_width=True, key="generate_button"):
-                with st.spinner(f"Generating DTR files for {len(employees_in_month)} employees..."):
+            if st.button("📋 GENERATE CIVIL SERVICE FORM NO. 48", type="primary", use_container_width=True):
+                with st.spinner(f"Generating DTR files for {len(employees)} employees..."):
                     try:
-                        # Generate DTR for each employee
                         excel_files = []
+                        error_count = 0
                         success_count = 0
                         
-                        for emp_no in employees_in_month:
+                        for emp_no in employees:
                             try:
-                                # Get employee data
+                                # Get employee data - SAFE VERSION
                                 emp_df = month_df[month_df['EmployeeNo'] == emp_no].copy()
                                 
-                                # SAFE: Get employee name with multiple fallbacks
-                                emp_name = None
+                                # Check if dataframe is empty
+                                if emp_df.empty:
+                                    st.warning(f"⚠️ No data found for employee {emp_no} in {month_name} {year_num}")
+                                    error_count += 1
+                                    continue
                                 
-                                # Try multiple ways to get the name
+                                # Get employee name - SAFE VERSION
+                                emp_name = "EMPLOYEE"
                                 if emp_no in st.session_state.employee_settings:
                                     emp_settings = st.session_state.employee_settings[emp_no]
                                     if isinstance(emp_settings, dict) and 'name' in emp_settings:
                                         emp_name = emp_settings['name']
-                                
-                                # If still not found, try string version
-                                if not emp_name:
-                                    emp_no_str = str(emp_no)
-                                    if emp_no_str in st.session_state.employee_settings:
-                                        emp_settings = st.session_state.employee_settings[emp_no_str]
-                                        if isinstance(emp_settings, dict) and 'name' in emp_settings:
-                                            emp_name = emp_settings['name']
-                                
-                                # Final fallback
-                                if not emp_name:
+                                    else:
+                                        emp_name = f"EMPLOYEE {emp_no}"
+                                else:
                                     emp_name = f"EMPLOYEE {emp_no}"
                                 
-                                # Generate DTR Excel
+                                # Check if emp_df has required columns
+                                if 'Day' not in emp_df.columns or 'Time' not in emp_df.columns:
+                                    st.warning(f"⚠️ Missing columns for employee {emp_no}")
+                                    error_count += 1
+                                    continue
+                                
+                                # Generate DTR
                                 excel_file = generate_civil_service_dtr(
                                     employee_no=emp_no,
                                     employee_name=emp_name,
@@ -819,231 +788,80 @@ if 'raw_data' in st.session_state:
                                 success_count += 1
                                 
                             except Exception as emp_error:
-                                st.warning(f"Error processing {emp_no}: {str(emp_error)}")
+                                error_count += 1
+                                st.error(f"❌ Error processing {emp_no}: {str(emp_error)[:100]}...")
                                 continue
                         
+                        # Results
                         if excel_files:
-                            # Create ZIP file
-                            zip_buffer = create_zip_file(excel_files, month_name, year_num)
+                            st.markdown(f'<div class="success-box">✅ Successfully generated {success_count} DTR files ({error_count} errors)</div>', unsafe_allow_html=True)
                             
-                            # Success message
-                            st.success(f"✅ Successfully generated {success_count} DTR files for {month_name} {year_num}")
+                            # Create ZIP
+                            zip_buffer = create_zip_file(excel_files, month_name, year_num)
                             
                             # Download buttons
                             col1, col2 = st.columns(2)
                             
                             with col1:
                                 st.download_button(
-                                    label="📥 Download All DTR Files (ZIP)",
+                                    label="📦 Download ALL DTR Files (ZIP)",
                                     data=zip_buffer,
-                                    file_name=f"DTR_CivilService_{month_name}_{year_num}.zip",
+                                    file_name=f"DTR_{month_name}_{year_num}.zip",
                                     mime="application/zip",
                                     use_container_width=True
                                 )
                             
                             with col2:
-                                # Display individual download buttons
-                                st.subheader("📥 Download Individual DTR")
-                                
-                                # Group by columns
-                                cols = st.columns(3)
-                                for idx, file_info in enumerate(excel_files[:15]):  # Limit to 15 for display
-                                    with cols[idx % 3]:
-                                        short_name = file_info['employee_name'][:20] + "..." if len(file_info['employee_name']) > 20 else file_info['employee_name']
+                                # Individual files
+                                with st.expander("📥 Download Individual Files"):
+                                    for file_info in excel_files:
                                         st.download_button(
-                                            label=f"{short_name}",
+                                            label=f"⬇️ {file_info['employee_name']}",
                                             data=file_info['excel_file'],
-                                            file_name=f"DTR_{file_info['employee_name'].replace(',', '')}_{month_name}_{year_num}.xlsx",
+                                            file_name=f"DTR_{file_info['employee_name']}_{month_name}_{year_num}.xlsx",
                                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                                         )
-                                
-                                # If more than 15, show in expander
-                                if len(excel_files) > 15:
-                                    with st.expander(f"Show all {len(excel_files)} files"):
-                                        for idx, file_info in enumerate(excel_files[15:]):
-                                            st.download_button(
-                                                label=f"{file_info['employee_name']}",
-                                                data=file_info['excel_file'],
-                                                file_name=f"DTR_{file_info['employee_name'].replace(',', '')}_{month_name}_{year_num}.xlsx",
-                                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                                key=f"extra_{idx}"
-                                            )
-                            
-                            # Save data option
-                            st.markdown("---")
-                            st.subheader("💾 Save Data for Future Printing")
-                            
-                            save_name = st.text_input(
-                                "Save as (optional):",
-                                value=f"DTR_Data_{month_name}_{year_num}",
-                                help="This will save the processed data for future re-printing",
-                                key="save_name"
-                            )
-                            
-                            if st.button("💾 Save Data for This Month", key="save_button"):
-                                # Save to session state
-                                key = f"{month_name}_{year_num}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                                st.session_state.dtr_data[key] = {
-                                    'month_df': month_df,
-                                    'office_hours': st.session_state.office_hours.copy(),
-                                    'employee_settings': st.session_state.employee_settings.copy(),
-                                    'timestamp': datetime.now(),
-                                    'month_name': month_name,
-                                    'year': year_num
-                                }
-                                st.success(f"✅ Data saved for {month_name} {year_num}")
-                        
                         else:
-                            st.error("No DTR files were generated. Please check the data.")
-                    
+                            st.error("❌ No DTR files were generated. Please check your data.")
+                            
                     except Exception as e:
                         st.error(f"❌ Error generating DTR: {str(e)}")
-                        
-                        # Debug info
-                        with st.expander("🔧 Debug Information"):
-                            st.write("**Error details:**")
-                            st.code(str(e))
-                            
-                            if 'employees_in_month' in locals():
-                                st.write(f"**Employees in month:** {employees_in_month}")
-                                st.write(f"**Employee settings keys:** {list(st.session_state.employee_settings.keys())}")
-        
         else:
-            st.warning(f"⚠️ No data found for {month_name} {year_num}")
-    
+            st.warning(f"No data found for {month_name} {year_num}")
     else:
-        st.warning("⚠️ No complete months found in the data")
-    
-    # Previous Saved Data Section
-    st.markdown("---")
-    st.subheader("📚 Previously Saved DTR Data")
-    
-    if st.session_state.dtr_data:
-        saved_keys = list(st.session_state.dtr_data.keys())
-        
-        for key in saved_keys[-5:]:  # Show last 5 saved
-            data = st.session_state.dtr_data[key]
-            with st.expander(f"📅 {data['month_name']} {data['year']} - Saved {data['timestamp'].strftime('%Y-%m-%d %H:%M')}"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write(f"**Employees:** {len(data['month_df']['EmployeeNo'].unique())}")
-                    st.write(f"**Records:** {len(data['month_df'])}")
-                    st.write(f"**Date Range:** {data['month_df']['Date'].min()} to {data['month_df']['Date'].max()}")
-                
-                with col2:
-                    st.write(f"**Office Hours:**")
-                    st.write(f"AM: {data['office_hours']['regular_am_in']} - {data['office_hours']['regular_am_out']}")
-                    st.write(f"PM: {data['office_hours']['regular_pm_in']} - {data['office_hours']['regular_pm_out']}")
-                    st.write(f"Saturday: {data['office_hours']['saturday']}")
-                
-                if st.button(f"🔄 Re-generate DTR for {data['month_name']} {data['year']}", key=f"regen_{key}"):
-                    st.info(f"Re-generating for {data['month_name']} {data['year']}...")
-                    # You can add re-generation logic here
-    else:
-        st.info("No previously saved DTR data found.")
-    
-    # Data Preview
-    st.markdown("---")
-    st.subheader("👀 Data Preview")
-    
-    tab1, tab2 = st.tabs(["Raw Data", "Daily Summary"])
-    
-    with tab1:
-        st.dataframe(df.head(100), use_container_width=True)
-        st.caption(f"Showing first 100 of {len(df)} records")
-    
-    with tab2:
-        if 'month_df' in locals():
-            # Create daily summary
-            summary = []
-            for date in sorted(month_df['Date'].unique()):
-                daily = month_df[month_df['Date'] == date]
-                for emp in daily['EmployeeNo'].unique():
-                    emp_daily = daily[daily['EmployeeNo'] == emp]
-                    times = emp_daily['Time'].tolist()
-                    
-                    if times:
-                        time_in = min(times)
-                        time_out = max(times)
-                        
-                        summary.append({
-                            'Date': date,
-                            'Employee': emp,
-                            'Records': len(emp_daily),
-                            'First Log': time_in.strftime('%H:%M:%S') if hasattr(time_in, 'strftime') else str(time_in),
-                            'Last Log': time_out.strftime('%H:%M:%S') if hasattr(time_out, 'strftime') else str(time_out)
-                        })
-            
-            if summary:
-                summary_df = pd.DataFrame(summary)
-                st.dataframe(summary_df, use_container_width=True)
-                st.caption(f"Daily summary for {len(summary)} employee-days")
+        st.warning("No valid months found in the data")
 
 else:
     # Welcome screen
-    col1, col2 = st.columns(2)
+    st.markdown("""
+    <div style="background-color: #F3F4F6; padding: 2rem; border-radius: 10px; text-align: center;">
+    <h2>Welcome to DTR Generator</h2>
+    <p>Please upload your attendance data file to get started.</p>
     
-    with col1:
-        st.markdown("""
-        <div class="cs-form">
-        <div class="form-title">Civil Service Form No. 48</div>
-        <h3>📋 DAILY TIME RECORD</h3>
-        <p><strong>Department of Education</strong></p>
-        <p>Division of Davao del Sur</p>
-        <p>Manual National High School</p>
-        <hr>
-        <p><strong>How to use:</strong></p>
-        <ol>
-            <li>📤 <strong>Upload</strong> your .dat file (biometric data)</li>
-            <li>⏰ <strong>Set</strong> office hours in settings</li>
-            <li>👤 <strong>Enter</strong> employee names</li>
-            <li>📅 <strong>Select</strong> month to generate DTR</li>
-            <li>📥 <strong>Download</strong> Excel files</li>
-        </ol>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style="background-color: #EFF6FF; padding: 2rem; border-radius: 10px;">
-        <h3>🎯 Features</h3>
-        <ul>
-            <li>✅ <strong>Exact Civil Service Form No. 48 format</strong></li>
-            <li>✅ <strong>Auto-fill from .dat files</strong></li>
-            <li>✅ <strong>Employee No. from .dat file</strong></li>
-            <li>✅ <strong>Month/Year from data</strong></li>
-            <li>✅ <strong>Save data for future printing</strong></li>
-            <li>✅ <strong>Customizable office hours</strong></li>
-            <li>✅ <strong>Auto-mark Saturdays/Sundays</strong></li>
-            <li>✅ <strong>Protected time cells</strong></li>
-            <li>✅ <strong>Excel format</strong></li>
-        </ul>
-        
-        <h3>📝 Required Format</h3>
-        <p>.dat file should have:</p>
-        <pre>
-        EmployeeNo,DateTime
-        7220970,2026-01-05 06:51:00
-        7220970,2026-01-05 11:54:00
-        </pre>
-        
-        <h3>⚠️ Troubleshooting</h3>
-        <p>If you get errors:</p>
-        <ol>
-            <li>Check file format</li>
-            <li>Ensure EmployeeNo and DateTime columns exist</li>
-            <li>Click "Initialize All Employee Names"</li>
-        </ol>
-        </div>
-        """, unsafe_allow_html=True)
+    <div style="text-align: left; margin: 2rem 0;">
+    <h4>📝 File Format Example:</h4>
+    <pre style="background-color: #1E293B; color: white; padding: 1rem; border-radius: 5px;">
+7220970 2026-01-01 07:30:00
+7220970 2026-01-01 11:50:00
+7220970 2026-01-01 12:50:00
+7220970 2026-01-01 16:30:00
+    </pre>
+    <p>Or CSV format:</p>
+    <pre style="background-color: #1E293B; color: white; padding: 1rem; border-radius: 5px;">
+EmployeeNo,DateTime
+7220970,2026-01-01 07:30:00
+7220970,2026-01-01 11:50:00
+    </pre>
+    </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")
 st.markdown(
     """
     <div style="text-align: center; color: gray;">
-    <p>Civil Service Form No. 48 DTR Generator v2.1 | For DepEd Manual National High School</p>
-    <p>Fixed: 'NoneType' object is not iterable error | Employee name handling improved</p>
+    <p>Civil Service Form No. 48 DTR Generator v3.0 | Fixed: 'NoneType' object is not iterable</p>
     </div>
     """,
     unsafe_allow_html=True
