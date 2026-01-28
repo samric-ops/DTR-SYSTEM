@@ -524,7 +524,7 @@ def create_zip_file(excel_files, month, year):
     return zip_buffer
 
 # =============================================
-# STREAMLIT APP - ULTRA SIMPLE VERSION
+# STREAMLIT APP - SIMPLE & ROBUST
 # =============================================
 
 # Page configuration
@@ -550,233 +550,268 @@ if 'office_hours' not in st.session_state:
 
 # App title
 st.title("📋 Civil Service Form No. 48 - DTR Generator")
+st.markdown("Generate Daily Time Records from biometric attendance files")
 
-# File Upload Section
+# ========== FILE UPLOAD SECTION ==========
 st.header("1. Upload Attendance File")
 
 uploaded_file = st.file_uploader(
-    "Choose .dat, .txt, or .csv file",
+    "Choose your .dat file",
     type=['dat', 'txt', 'csv'],
-    help="Upload your biometric attendance file"
+    help="Upload biometric attendance file (ZKTeco format)"
 )
 
 if uploaded_file:
     try:
-        # Try to read as CSV first
-        try:
-            df = pd.read_csv(uploaded_file)
-        except:
-            # If CSV fails, read as space/tab separated
-            uploaded_file.seek(0)
-            df = pd.read_csv(uploaded_file, sep='\s+', header=None)
+        # Read file as text
+        content = uploaded_file.read().decode('utf-8', errors='ignore')
+        lines = content.strip().split('\n')
         
-        # Check columns
-        if len(df.columns) >= 2:
-            # Rename columns
-            df.columns = ['EmployeeNo', 'DateTime'] + [f'Col{i}' for i in range(2, len(df.columns))]
-            
-            # Convert DateTime
-            df['DateTime'] = pd.to_datetime(df['DateTime'], errors='coerce')
-            df = df.dropna(subset=['DateTime'])
-            
-            # Add date components
-            df['Date'] = df['DateTime'].dt.date
-            df['Time'] = df['DateTime'].dt.time
-            df['Month'] = df['DateTime'].dt.month
-            df['Year'] = df['DateTime'].dt.year
-            df['Day'] = df['DateTime'].dt.day
-            
-            # Convert EmployeeNo to string
-            df['EmployeeNo'] = df['EmployeeNo'].astype(str).str.strip()
-            
-            # Store in session state
+        # Debug: Show file info
+        st.info(f"📁 File: {uploaded_file.name} | Lines: {len(lines)}")
+        
+        # Parse ZKTeco .dat format
+        data = []
+        for i, line in enumerate(lines[:100]):  # Process first 100 lines for testing
+            if line.strip():
+                # ZKTeco format is usually: ID\tDateTime\tStatus
+                parts = line.strip().split('\t')
+                
+                if len(parts) >= 2:
+                    emp_no = parts[0].strip()
+                    datetime_str = parts[1].strip()
+                    
+                    # Try to parse datetime
+                    try:
+                        # Common ZKTeco format: 2024-01-01 07:30:00
+                        dt = datetime.strptime(datetime_str, '%Y-%m-%d %H:%M:%S')
+                        data.append({
+                            'EmployeeNo': emp_no,
+                            'DateTime': dt,
+                            'Date': dt.date(),
+                            'Time': dt.time(),
+                            'Month': dt.month,
+                            'Year': dt.year,
+                            'Day': dt.day
+                        })
+                    except:
+                        # Try other formats
+                        try:
+                            dt = datetime.strptime(datetime_str, '%m/%d/%Y %H:%M:%S')
+                            data.append({
+                                'EmployeeNo': emp_no,
+                                'DateTime': dt,
+                                'Date': dt.date(),
+                                'Time': dt.time(),
+                                'Month': dt.month,
+                                'Year': dt.year,
+                                'Day': dt.day
+                            })
+                        except:
+                            # Skip if can't parse
+                            continue
+        
+        if data:
+            df = pd.DataFrame(data)
             st.session_state.raw_data = df
             
-            st.success(f"✅ File loaded successfully!")
-            st.info(f"**Records:** {len(df)} | **Employees:** {df['EmployeeNo'].nunique()} | **Date Range:** {df['Date'].min()} to {df['Date'].max()}")
+            st.success(f"✅ Successfully parsed {len(df)} records")
+            
+            # Show summary
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Records", len(df))
+            with col2:
+                st.metric("Unique Employees", df['EmployeeNo'].nunique())
+            with col3:
+                st.metric("Date Range", f"{df['Date'].min()} to {df['Date'].max()}")
             
             # Show sample
-            with st.expander("📊 Preview Data"):
+            with st.expander("👀 Preview Data"):
                 st.dataframe(df.head(20))
-                
         else:
-            st.error("File must have at least 2 columns: EmployeeNo and DateTime")
+            st.error("❌ Could not parse any valid records from the file.")
             
+            # Show file content for debugging
+            with st.expander("🔍 Debug - Show file content"):
+                st.text("First 10 lines of file:")
+                for i, line in enumerate(lines[:10]):
+                    st.code(f"Line {i+1}: {line}")
+    
     except Exception as e:
-        st.error(f"Error reading file: {str(e)}")
+        st.error(f"❌ Error reading file: {str(e)}")
 
-# Office Hours
+# ========== OFFICE HOURS SECTION ==========
 st.header("2. Set Office Hours")
 
 col1, col2 = st.columns(2)
 with col1:
-    st.session_state.office_hours['regular_am_in'] = st.text_input("AM Time In", "07:30")
-    st.session_state.office_hours['regular_am_out'] = st.text_input("AM Time Out", "11:50")
+    am_in = st.text_input("AM Time In", "07:30", key="am_in")
+    am_out = st.text_input("AM Time Out", "11:50", key="am_out")
 with col2:
-    st.session_state.office_hours['regular_pm_in'] = st.text_input("PM Time In", "12:50")
-    st.session_state.office_hours['regular_pm_out'] = st.text_input("PM Time Out", "16:30")
+    pm_in = st.text_input("PM Time In", "12:50", key="pm_in")
+    pm_out = st.text_input("PM Time Out", "16:30", key="pm_out")
 
-st.session_state.office_hours['saturday'] = st.text_input("Saturday Hours", "AS REQUIRED")
+saturday_hours = st.text_input("Saturday Hours", "AS REQUIRED", key="saturday")
 
-# Main Processing
+st.session_state.office_hours = {
+    'regular_am_in': am_in,
+    'regular_am_out': am_out,
+    'regular_pm_in': pm_in,
+    'regular_pm_out': pm_out,
+    'saturday': saturday_hours
+}
+
+# ========== MAIN PROCESSING SECTION ==========
 if st.session_state.raw_data is not None:
     df = st.session_state.raw_data
     
     st.header("3. Generate DTR")
     
     # Month selection
-    unique_months = df[['Month', 'Year']].drop_duplicates().sort_values(['Year', 'Month'])
-    
-    if not unique_months.empty:
-        # Create month options
-        month_options = []
-        for _, row in unique_months.iterrows():
-            month_name = calendar.month_name[row['Month']]
-            month_options.append(f"{month_name} {row['Year']}")
+    if 'Month' in df.columns and 'Year' in df.columns:
+        unique_months = df[['Month', 'Year']].drop_duplicates().sort_values(['Year', 'Month'])
         
-        selected_month = st.selectbox("Select Month", month_options)
-        
-        # Parse selection
-        month_name, year_str = selected_month.split()
-        month_num = list(calendar.month_name).index(month_name)
-        year_num = int(year_str)
-        
-        # Filter data for selected month
-        month_df = df[(df['Month'] == month_num) & (df['Year'] == year_num)].copy()
-        
-        if not month_df.empty:
-            st.info(f"**Found {len(month_df)} records for {month_name} {year_num}**")
+        if not unique_months.empty:
+            # Create month options
+            month_options = []
+            for _, row in unique_months.iterrows():
+                month_name = calendar.month_name[row['Month']]
+                month_options.append(f"{month_name} {row['Year']}")
             
-            # Get unique employees
-            employees = sorted(month_df['EmployeeNo'].unique())
+            selected_month = st.selectbox("Select Month", month_options)
             
-            # Initialize employee settings
-            for emp in employees:
-                if emp not in st.session_state.employee_settings:
-                    st.session_state.employee_settings[emp] = {
-                        'name': f"EMPLOYEE {emp}",
-                        'employee_no': emp
-                    }
+            # Parse selection
+            month_name, year_str = selected_month.split()
+            month_num = list(calendar.month_name).index(month_name)
+            year_num = int(year_str)
             
-            # Employee names editor
-            with st.expander("✏️ Edit Employee Names"):
-                st.write(f"Editing {len(employees)} employees")
+            # Filter data
+            month_df = df[(df['Month'] == month_num) & (df['Year'] == year_num)].copy()
+            
+            if not month_df.empty:
+                # Summary
+                st.info(f"📊 **{len(month_df)} records found for {month_name} {year_num}**")
                 
+                # Get employees
+                employees = sorted(month_df['EmployeeNo'].unique())
+                
+                # Initialize employee names
                 for emp in employees:
-                    current_name = st.session_state.employee_settings[emp]['name']
-                    new_name = st.text_input(
-                        f"Employee {emp}",
-                        value=current_name,
-                        key=f"name_editor_{emp}"
-                    )
-                    if new_name != current_name:
-                        st.session_state.employee_settings[emp]['name'] = new_name
-            
-            # Generate button
-            st.markdown("---")
-            
-            if st.button("🚀 GENERATE DTR FILES", type="primary", use_container_width=True):
-                with st.spinner(f"Generating DTR files for {len(employees)} employees..."):
-                    excel_files = []
-                    errors = []
-                    
-                    for emp_no in employees:
-                        try:
-                            # Get employee data - EXTRA SAFE
-                            emp_df = month_df[month_df['EmployeeNo'] == emp_no].copy()
-                            
-                            # CRITICAL FIX: Check if emp_df is valid
-                            if emp_df is None or emp_df.empty:
-                                errors.append(f"Employee {emp_no}: No data found")
+                    if emp not in st.session_state.employee_settings:
+                        st.session_state.employee_settings[emp] = {
+                            'name': f"EMPLOYEE {emp}",
+                            'employee_no': emp
+                        }
+                
+                # Edit employee names
+                with st.expander(f"✏️ Edit Employee Names ({len(employees)} employees)"):
+                    for emp in employees:
+                        current_name = st.session_state.employee_settings[emp]['name']
+                        new_name = st.text_input(
+                            f"Employee {emp}",
+                            value=current_name,
+                            key=f"name_{emp}"
+                        )
+                        if new_name != current_name:
+                            st.session_state.employee_settings[emp]['name'] = new_name
+                
+                # Generate button
+                st.markdown("---")
+                
+                if st.button("🚀 GENERATE DTR FILES NOW", type="primary", use_container_width=True):
+                    with st.spinner(f"Generating {len(employees)} DTR files..."):
+                        excel_files = []
+                        errors = []
+                        
+                        for emp_no in employees:
+                            try:
+                                # Get employee data
+                                emp_df = month_df[month_df['EmployeeNo'] == emp_no].copy()
+                                
+                                if emp_df.empty:
+                                    errors.append(f"Employee {emp_no}: No records found")
+                                    continue
+                                
+                                # Get employee name
+                                emp_name = st.session_state.employee_settings.get(
+                                    emp_no, 
+                                    {'name': f"EMPLOYEE {emp_no}"}
+                                )['name']
+                                
+                                # Generate DTR
+                                excel_file = generate_civil_service_dtr(
+                                    employee_no=emp_no,
+                                    employee_name=emp_name,
+                                    month=month_num,
+                                    year=year_num,
+                                    attendance_data=emp_df,
+                                    office_hours=st.session_state.office_hours
+                                )
+                                
+                                excel_files.append({
+                                    'employee_no': emp_no,
+                                    'employee_name': emp_name,
+                                    'excel_file': excel_file
+                                })
+                                
+                            except Exception as e:
+                                errors.append(f"Employee {emp_no}: {str(e)[:100]}")
                                 continue
-                            
-                            # Check if it's a DataFrame
-                            if not isinstance(emp_df, pd.DataFrame):
-                                errors.append(f"Employee {emp_no}: Invalid data type")
-                                continue
-                            
-                            # Get employee name
-                            emp_name = st.session_state.employee_settings.get(
-                                emp_no, 
-                                {'name': f"EMPLOYEE {emp_no}"}
-                            )['name']
-                            
-                            # DEBUG: Show what's being passed
-                            # st.write(f"Processing {emp_no}: {len(emp_df)} records")
-                            
-                            # Generate DTR
-                            excel_file = generate_civil_service_dtr(
-                                employee_no=emp_no,
-                                employee_name=emp_name,
-                                month=month_num,
-                                year=year_num,
-                                attendance_data=emp_df,  # This should be valid now
-                                office_hours=st.session_state.office_hours
-                            )
-                            
-                            excel_files.append({
-                                'employee_no': emp_no,
-                                'employee_name': emp_name,
-                                'excel_file': excel_file
-                            })
-                            
-                        except Exception as e:
-                            errors.append(f"Employee {emp_no}: {str(e)[:50]}")
-                            # Continue processing other employees
-                            continue
-                    
-                    # Show results
-                    if excel_files:
-                        st.success(f"✅ Successfully generated {len(excel_files)} DTR files")
                         
-                        if errors:
-                            st.warning(f"⚠️ {len(errors)} errors occurred")
-                            with st.expander("Show Errors"):
-                                for error in errors:
-                                    st.write(error)
-                        
-                        # Create ZIP file
-                        zip_buffer = create_zip_file(excel_files, month_name, year_num)
-                        
-                        # Download buttons
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.download_button(
-                                label="📦 DOWNLOAD ALL FILES (ZIP)",
-                                data=zip_buffer,
-                                file_name=f"DTR_{month_name}_{year_num}.zip",
-                                mime="application/zip",
-                                use_container_width=True
-                            )
-                        
-                        with col2:
-                            # Individual files
-                            with st.expander("📥 Download Individual Files"):
-                                for file_info in excel_files:
-                                    st.download_button(
-                                        label=f"⬇️ {file_info['employee_name'][:30]}",
-                                        data=file_info['excel_file'],
-                                        file_name=f"DTR_{file_info['employee_name']}_{month_name}_{year_num}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                    )
-                    else:
-                        st.error("❌ No files were generated. Please check your data.")
-                        
-                        if errors:
-                            with st.expander("Error Details"):
-                                for error in errors:
-                                    st.write(error)
-        else:
-            st.warning(f"No data found for {month_name} {year_num}")
+                        # Results
+                        if excel_files:
+                            st.success(f"✅ Successfully generated {len(excel_files)} DTR files!")
+                            
+                            if errors:
+                                st.warning(f"⚠️ {len(errors)} errors occurred")
+                                with st.expander("Show Errors"):
+                                    for error in errors:
+                                        st.write(error)
+                            
+                            # Create ZIP
+                            zip_buffer = create_zip_file(excel_files, month_name, year_num)
+                            
+                            # Download buttons
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.download_button(
+                                    label="📦 DOWNLOAD ALL (ZIP)",
+                                    data=zip_buffer,
+                                    file_name=f"DTR_{month_name}_{year_num}.zip",
+                                    mime="application/zip",
+                                    use_container_width=True
+                                )
+                            
+                            with col2:
+                                with st.expander("📥 Individual Files"):
+                                    for file_info in excel_files:
+                                        st.download_button(
+                                            label=f"⬇️ {file_info['employee_name'][:20]}",
+                                            data=file_info['excel_file'],
+                                            file_name=f"DTR_{file_info['employee_name']}_{month_name}_{year_num}.xlsx",
+                                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                        )
+                        else:
+                            st.error("❌ No files were generated.")
+                            
+                            if errors:
+                                with st.expander("Error Details"):
+                                    for error in errors:
+                                        st.write(error)
+            else:
+                st.warning(f"No data found for {month_name} {year_num}")
+    else:
+        st.error("Dataframe doesn't have Month/Year columns. Please check file format.")
 
 # Footer
 st.markdown("---")
 st.markdown(
     """
     <div style="text-align: center; color: gray;">
-    <p>Civil Service Form No. 48 DTR Generator | Version 4.0 - Fixed 'NoneType' error</p>
-    <p><small>If errors persist, check your file format and try again.</small></p>
+    <p>Civil Service Form No. 48 DTR Generator | Version 5.0 - Fixed File Reading</p>
+    <p><small>Supports ZKTeco .dat format • Manual National High School</small></p>
     </div>
     """,
     unsafe_allow_html=True
