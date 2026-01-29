@@ -1,10 +1,16 @@
 import streamlit as st
 import pandas as pd
 import calendar
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, Border, Side, PatternFill
-from openpyxl.utils import get_column_letter
+from reportlab.lib.pagesizes import A4, portrait, landscape
+from reportlab.lib.units import cm, inch, mm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib import colors
+from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
+import math
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(page_title="DTR Generator (CS Form 48)", layout="wide")
@@ -55,482 +61,477 @@ edited_df = st.data_editor(
 )
 
 # ---------------- GENERATE BUTTON ----------------
-if st.button("📄 Generate DTR Excel File", type="primary"):
+if st.button("📄 Generate DTR PDF File", type="primary"):
     try:
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "DTR"
+        # Create buffer for PDF
+        buffer = BytesIO()
         
-        # Remove default gridlines
-        ws.sheet_view.showGridLines = False
-
-        # Define styles - USING ARIAL FONT
-        center = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        left = Alignment(horizontal="left", vertical="center")
-        right = Alignment(horizontal="right", vertical="center")
+        # Page setup - A4 Portrait with custom margins
+        page_width, page_height = portrait(A4)
         
-        # Arial Font definitions
-        font_arial_6 = Font(name='Arial', size=6)
-        font_arial_7 = Font(name='Arial', size=7)
-        font_arial_8 = Font(name='Arial', size=8)
-        font_arial_8_bold = Font(name='Arial', size=8, bold=True)
-        font_arial_9 = Font(name='Arial', size=9)
-        font_arial_10 = Font(name='Arial', size=10)
-        font_arial_10_bold = Font(name='Arial', size=10, bold=True)
-        font_arial_10_bold_underline = Font(name='Arial', size=10, bold=True, underline='single')
-        font_arial_11_bold = Font(name='Arial', size=11, bold=True)
-        font_arial_12_bold = Font(name='Arial', size=12, bold=True)
-        font_arial_8_italic = Font(name='Arial', size=8, italic=True)
+        # Margins in cm (convert to points: 1 cm = 28.3465 points)
+        top_margin = 1.9 * cm
+        bottom_margin = 0.49 * cm
+        left_margin = 1.27 * cm
+        right_margin = 1.27 * cm
         
-        thin = Side(style="thin", color="000000")
-        border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-        # Set column widths for TWO DTRs side by side
-        # LEFT DTR: Columns A-J (10 columns for left DTR)
-        # RIGHT DTR: Columns L-U (10 columns for right DTR, K is spacer)
+        # Calculate usable width and height
+        usable_width = page_width - left_margin - right_margin
+        usable_height = page_height - top_margin - bottom_margin
         
-        # Column widths based on your specification
-        dtr_columns = [
-            2.5,   # A/L: Day (narrow)
-            3.0,   # B/M: A.M. header
-            3.0,   # C/N: Arrival
-            3.0,   # D/O: Departure
-            3.0,   # E/P: P.M. header
-            3.0,   # F/Q: Arrival
-            3.0,   # G/R: Departure
-            3.5,   # H/S: Undertime header
-            2.5,   # I/T: Hours
-            2.5    # J/U: Minutes
-        ]
+        # Each DTR gets half of usable width
+        dtr_width = usable_width / 2
+        spacer_width = 0.5 * cm  # Space between two DTRs
         
-        # Set left DTR columns (A-J)
-        for i, width in enumerate(dtr_columns, 1):
-            col_letter = get_column_letter(i)
-            ws.column_dimensions[col_letter].width = width
+        # Create PDF document
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=portrait(A4),
+            leftMargin=left_margin,
+            rightMargin=right_margin,
+            topMargin=top_margin,
+            bottomMargin=bottom_margin
+        )
         
-        # Set spacer column K
-        ws.column_dimensions['K'].width = 1.0
+        # Styles
+        styles = getSampleStyleSheet()
         
-        # Set right DTR columns (L-U)
-        for i, width in enumerate(dtr_columns, 1):
-            col_letter = get_column_letter(11 + i)  # L is 12th column (11+1)
-            ws.column_dimensions[col_letter].width = width
+        # Custom styles
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=12,
+            alignment=1,  # Center
+            spaceAfter=6
+        )
         
-        # Set row heights
-        ws.row_dimensions[1].height = 12
-        ws.row_dimensions[2].height = 12
-        ws.row_dimensions[3].height = 12
-        ws.row_dimensions[4].height = 12
-        ws.row_dimensions[5].height = 6  # Small space
-        ws.row_dimensions[6].height = 12
-        ws.row_dimensions[7].height = 12
-        ws.row_dimensions[8].height = 12
-        ws.row_dimensions[9].height = 12
-        ws.row_dimensions[10].height = 12
-        ws.row_dimensions[11].height = 12
-        ws.row_dimensions[12].height = 12
-        ws.row_dimensions[13].height = 12
-        ws.row_dimensions[14].height = 15  # Table header
+        header_style = ParagraphStyle(
+            'CustomHeader',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=8,
+            alignment=1,  # Center
+            spaceAfter=3
+        )
         
-        # Set table rows to 12
-        for row in range(15, 50):
-            ws.row_dimensions[row].height = 12
-
-        # -------- FUNCTION TO CREATE ONE DTR --------
-        def create_dtr(start_col, start_row):
-            """Create one complete DTR starting at specified column"""
-            r = start_row
-            col = start_col
+        name_style = ParagraphStyle(
+            'CustomName',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=10,
+            alignment=1,  # Center
+            spaceAfter=3,
+            textDecoration='underline'
+        )
+        
+        small_style = ParagraphStyle(
+            'CustomSmall',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=7,
+            alignment=1,  # Center
+            spaceAfter=2
+        )
+        
+        table_header_style = ParagraphStyle(
+            'TableHeader',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=8,
+            alignment=1,  # Center
+        )
+        
+        table_cell_style = ParagraphStyle(
+            'TableCell',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=8,
+            alignment=1,  # Center
+        )
+        
+        footer_style = ParagraphStyle(
+            'FooterStyle',
+            parent=styles['Normal'],
+            fontName='Helvetica',
+            fontSize=8,
+            alignment=1,  # Center
+            fontStyle='italic'
+        )
+        
+        # -------- FUNCTION TO CREATE ONE DTR TABLE --------
+        def create_dtr_table_data(is_left=True):
+            """Create table data for one DTR"""
+            table_data = []
             
-            # 1. REPUBLIC OF THE PHILIPPINES Header (4 lines combined)
-            cell = ws.cell(row=r, column=col, 
-                          value="REPUBLIC OF THE PHILIPPINES\nDepartment of Education\nDivision of Davao del Sur\nManual National High School")
-            ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col+9)
-            cell.alignment = center
-            cell.font = font_arial_8
-            r += 1
+            # 1. REPUBLIC Header (4 lines)
+            table_data.append([Paragraph(
+                "REPUBLIC OF THE PHILIPPINES<br/>"
+                "Department of Education<br/>"
+                "Division of Davao del Sur<br/>"
+                "Manual National High School",
+                header_style
+            )])
             
-            # 2. Blank line (0.3 space)
-            r += 1
+            # 2. Blank line
+            table_data.append([""])
             
-            # 3. Civil Service Form No. 48 and Employee No.
-            # Left part
-            cell_left = ws.cell(row=r, column=col, value="Civil Service Form No. 48")
-            ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col+4)
-            cell_left.alignment = left
-            cell_left.font = font_arial_8
+            # 3. Civil Service Form and Employee No.
+            form_text = f"Civil Service Form No. 48{'&nbsp;' * 30}Employee No. {employee_no}"
+            table_data.append([Paragraph(form_text, header_style)])
             
-            # Right part with underline for Employee No.
-            cell_right = ws.cell(row=r, column=col+5, value=f"Employee No. {employee_no}")
-            ws.merge_cells(start_row=r, start_column=col+5, end_row=r, end_column=col+9)
-            cell_right.alignment = right
-            cell_right.font = font_arial_8
-            # Add underline (simulated with border bottom)
-            for c in range(col+5, col+10):
-                ws.cell(row=r, column=c).border = Border(bottom=thin)
-            r += 1
+            # 4. Blank line
+            table_data.append([""])
             
-            # 4. Blank line (0.3 space)
-            r += 1
+            # 5. DAILY TIME RECORD
+            table_data.append([Paragraph("DAILY TIME RECORD", title_style)])
             
-            # 5. DAILY TIME RECORD (centered, size 12, bold)
-            cell = ws.cell(row=r, column=col, value="DAILY TIME RECORD")
-            ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col+9)
-            cell.alignment = center
-            cell.font = font_arial_12_bold
-            r += 1
+            # 6. -----o0o-----
+            table_data.append([Paragraph("-----o0o-----", header_style)])
             
-            # 6. -----o0o----- (no space downward)
-            cell = ws.cell(row=r, column=col, value="-----o0o-----")
-            ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col+9)
-            cell.alignment = center
-            cell.font = font_arial_8
-            r += 1
+            # 7. Employee Name
+            table_data.append([Paragraph(employee_name, name_style)])
             
-            # 7. Employee Name (single line space, centered, size 10-11, bold, underlined)
-            cell = ws.cell(row=r, column=col, value=employee_name)
-            ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col+9)
-            cell.alignment = center
-            cell.font = font_arial_10_bold_underline
-            r += 1
+            # 8. (Name) label
+            table_data.append([Paragraph("(Name)", small_style)])
             
-            # 8. "(Name)" label (centered, size 7-8, not bold)
-            cell = ws.cell(row=r, column=col, value="(Name)")
-            ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col+9)
-            cell.alignment = center
-            cell.font = font_arial_7
-            r += 1
+            # 9. Period and Official Hours
+            period_text = f"For the month of {month.upper()} {year}"
+            hours_text = f"Official hours for arrival and departure<br/>" \
+                        f"Regular days: {am_hours} / {pm_hours}<br/>" \
+                        f"Saturdays: {saturday_hours}"
             
-            # 9. Period and Official Hours (split into two parts)
-            # Left part: For the month of
-            cell_left = ws.cell(row=r, column=col, value=f"For the month of {month.upper()} {year}")
-            ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col+4)
-            cell_left.alignment = left
-            cell_left.font = font_arial_8
-            
-            # Right part: Official hours
-            hours_text = f"Official hours for arrival and departure\nRegular days: {am_hours} / {pm_hours}\nSaturdays: {saturday_hours}"
-            cell_right = ws.cell(row=r, column=col+5, value=hours_text)
-            ws.merge_cells(start_row=r, start_column=col+5, end_row=r+2, end_column=col+9)
-            cell_right.alignment = left
-            cell_right.font = font_arial_8
-            r += 3  # Move down 3 rows for the multi-line hours text
+            table_data.append([
+                Paragraph(period_text, header_style),
+                "",
+                "",
+                "",
+                "",
+                Paragraph(hours_text, header_style)
+            ])
             
             # 10. Blank line before table
-            r += 1
+            table_data.append([""])
             
-            # Store table start row
-            table_start_row = r
+            # 11. TABLE HEADER - First row
+            table_data.append([
+                Paragraph("Day", table_header_style),
+                Paragraph("A.M.", table_header_style),
+                "",
+                Paragraph("P.M.", table_header_style),
+                "",
+                Paragraph("Undertime", table_header_style),
+                ""
+            ])
             
-            # 11. TABLE HEADER
-            # Day column (merged vertically for 2 rows)
-            day_cell = ws.cell(row=r, column=col, value="Day")
-            ws.merge_cells(start_row=r, start_column=col, end_row=r+1, end_column=col)
-            day_cell.alignment = center
-            day_cell.font = font_arial_8_bold
-            day_cell.border = border
+            # 12. TABLE HEADER - Second row
+            table_data.append([
+                "",  # Day stays merged
+                Paragraph("Arrival", table_header_style),
+                Paragraph("Departure", table_header_style),
+                Paragraph("Arrival", table_header_style),
+                Paragraph("Departure", table_header_style),
+                Paragraph("Hours", table_header_style),
+                Paragraph("Minutes", table_header_style)
+            ])
             
-            # A.M. header (merged horizontally for 2 columns)
-            am_cell = ws.cell(row=r, column=col+1, value="A.M.")
-            ws.merge_cells(start_row=r, start_column=col+1, end_row=r, end_column=col+2)
-            am_cell.alignment = center
-            am_cell.font = font_arial_8_bold
-            am_cell.border = border
+            # 13-43. TABLE DATA (31 days)
+            for day_num in range(1, 32):
+                row = []
+                
+                if day_num <= len(edited_df):
+                    row_data = edited_df.iloc[day_num - 1]
+                    
+                    # Day number
+                    row.append(Paragraph(str(day_num), table_cell_style))
+                    
+                    # Check if SATURDAY/SUNDAY
+                    if str(row_data["AM In"]).strip() in ["SATURDAY", "SUNDAY"]:
+                        # Merge cells for weekend
+                        row.append(Paragraph(str(row_data["AM In"]).strip(), table_cell_style))
+                        row.append("")  # Will be merged
+                        row.append("")  # Will be merged
+                        row.append("")  # Will be merged
+                    else:
+                        # Regular day
+                        row.append(Paragraph(
+                            "" if pd.isna(row_data["AM In"]) else str(row_data["AM In"]), 
+                            table_cell_style
+                        ))
+                        row.append(Paragraph(
+                            "" if pd.isna(row_data["AM Out"]) else str(row_data["AM Out"]), 
+                            table_cell_style
+                        ))
+                        row.append(Paragraph(
+                            "" if pd.isna(row_data["PM In"]) else str(row_data["PM In"]), 
+                            table_cell_style
+                        ))
+                        row.append(Paragraph(
+                            "" if pd.isna(row_data["PM Out"]) else str(row_data["PM Out"]), 
+                            table_cell_style
+                        ))
+                    
+                    # Undertime columns (empty)
+                    row.append("")  # Hours
+                    row.append("")  # Minutes
+                else:
+                    # Empty row
+                    row = ["", "", "", "", "", "", ""]
+                
+                table_data.append(row)
             
-            # P.M. header (merged horizontally for 2 columns)
-            pm_cell = ws.cell(row=r, column=col+4, value="P.M.")
-            ws.merge_cells(start_row=r, start_column=col+4, end_row=r, end_column=col+5)
-            pm_cell.alignment = center
-            pm_cell.font = font_arial_8_bold
-            pm_cell.border = border
+            # 44. TOTAL ROW
+            table_data.append([
+                Paragraph("TOTAL", table_header_style),
+                "", "", "", "", "", ""
+            ])
             
-            # Undertime header (merged horizontally for 2 columns)
-            under_cell = ws.cell(row=r, column=col+7, value="Undertime")
-            ws.merge_cells(start_row=r, start_column=col+7, end_row=r, end_column=col+8)
-            under_cell.alignment = center
-            under_cell.font = font_arial_8_bold
-            under_cell.border = border
+            # 45-46. Blank lines
+            table_data.append([""])
+            table_data.append([""])
             
-            # Second row of headers
-            r += 1
+            # 47. Certification
+            cert_text = "I certify on my honor that the above is a true and correct report " \
+                       "of the hours of work performed, record of which was made daily at " \
+                       "the time of arrival and departure from office."
+            table_data.append([Paragraph(cert_text, footer_style)])
             
-            # Sub-headers for A.M.
-            arrival_am = ws.cell(row=r, column=col+1, value="Arrival")
-            arrival_am.alignment = center
-            arrival_am.font = font_arial_8_bold
-            arrival_am.border = border
+            # 48. Blank line
+            table_data.append([""])
             
-            departure_am = ws.cell(row=r, column=col+2, value="Departure")
-            departure_am.alignment = center
-            departure_am.font = font_arial_8_bold
-            departure_am.border = border
+            # 49. Signature line
+            table_data.append([Paragraph("_________________________", header_style)])
             
-            # Sub-headers for P.M.
-            arrival_pm = ws.cell(row=r, column=col+4, value="Arrival")
-            arrival_pm.alignment = center
-            arrival_pm.font = font_arial_8_bold
-            arrival_pm.border = border
+            # 50. Blank line
+            table_data.append([""])
             
-            departure_pm = ws.cell(row=r, column=col+5, value="Departure")
-            departure_pm.alignment = center
-            departure_pm.font = font_arial_8_bold
-            departure_pm.border = border
+            # 51. VERIFIED text
+            table_data.append([Paragraph("VERIFIED as to the prescribed office hours:", header_style)])
             
-            # Sub-headers for Undertime
-            hours = ws.cell(row=r, column=col+7, value="Hours")
-            hours.alignment = center
-            hours.font = font_arial_8_bold
-            hours.border = border
+            # 52. Blank line
+            table_data.append([""])
             
-            minutes = ws.cell(row=r, column=col+8, value="Minutes")
-            minutes.alignment = center
-            minutes.font = font_arial_8_bold
-            minutes.border = border
+            # 53. Principal signature line
+            table_data.append([Paragraph("_________________________", header_style)])
             
-            # Add borders to empty cells in header
-            ws.cell(row=r, column=col).border = border  # Day column bottom
-            ws.cell(row=r, column=col+3).border = border  # Spacer between AM/PM
-            ws.cell(row=r, column=col+6).border = border  # Spacer between PM/Undertime
-            ws.cell(row=r, column=col+9).border = border  # Empty cell
+            # 54. Principal III
+            table_data.append([Paragraph("Principal III", table_header_style)])
             
-            return table_start_row + 2  # Return first data row
-
-        # -------- CREATE LEFT DTR (Columns A-J) --------
-        data_start_left = create_dtr(1, 1)
+            return table_data
         
-        # -------- CREATE RIGHT DTR (Columns L-U) --------
-        data_start_right = create_dtr(12, 1)  # Column L is 12
+        # -------- CREATE TWO DTR TABLES --------
+        # We'll create a master table that contains both DTRs side by side
         
-        # Make sure both start at same row
-        data_start_row = max(data_start_left, data_start_right)
+        # Create data for left DTR
+        left_data = create_dtr_table_data(is_left=True)
+        right_data = create_dtr_table_data(is_left=False)
         
-        # -------- FILL TABLE DATA FOR BOTH DTRs --------
-        # We'll fill 31 rows for both DTRs
-        current_row = data_start_row
+        # Combine into one table with two columns
+        # Each DTR has 7 columns, so total 14 columns + 1 spacer
         
-        for day_num in range(1, 32):  # 1 to 31
+        # Calculate column widths
+        # Left DTR: 7 columns
+        # Spacer: 1 column
+        # Right DTR: 7 columns
+        total_cols = 15  # 7 + 1 + 7
+        
+        # Column widths (in points)
+        col_widths = []
+        
+        # Left DTR columns
+        left_cols = [dtr_width * 0.12,   # Day
+                    dtr_width * 0.16,    # A.M. Arrival
+                    dtr_width * 0.16,    # A.M. Departure
+                    dtr_width * 0.16,    # P.M. Arrival
+                    dtr_width * 0.16,    # P.M. Departure
+                    dtr_width * 0.12,    # Hours
+                    dtr_width * 0.12]    # Minutes
+        
+        col_widths.extend(left_cols)
+        col_widths.append(spacer_width)  # Spacer
+        col_widths.extend(left_cols)     # Right DTR (same widths)
+        
+        # Combine data from both DTRs
+        combined_data = []
+        
+        # Process each row
+        for i in range(max(len(left_data), len(right_data))):
+            combined_row = []
+            
+            # Add left DTR row
+            if i < len(left_data):
+                left_row = left_data[i]
+                if isinstance(left_row, list):
+                    combined_row.extend(left_row)
+                else:
+                    # Single cell that should span all 7 columns
+                    combined_row.append(left_row)
+                    combined_row.extend([""] * 6)  # Fill remaining cells
+            else:
+                combined_row.extend([""] * 7)
+            
+            # Add spacer column
+            combined_row.append("")
+            
+            # Add right DTR row
+            if i < len(right_data):
+                right_row = right_data[i]
+                if isinstance(right_row, list):
+                    combined_row.extend(right_row)
+                else:
+                    # Single cell that should span all 7 columns
+                    combined_row.append(right_row)
+                    combined_row.extend([""] * 6)  # Fill remaining cells
+            else:
+                combined_row.extend([""] * 7)
+            
+            combined_data.append(combined_row)
+        
+        # Create the table
+        table = Table(combined_data, colWidths=col_widths)
+        
+        # Apply table styles
+        table.setStyle(TableStyle([
+            # Global settings
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            
+            # Header rows (0-8) - span across 7 columns for each DTR
+            ('SPAN', (0, 0), (6, 0)),   # REPUBLIC header left
+            ('SPAN', (8, 0), (14, 0)),  # REPUBLIC header right
+            
+            ('SPAN', (0, 2), (6, 2)),   # Civil Service Form left
+            ('SPAN', (8, 2), (14, 2)),  # Civil Service Form right
+            
+            ('SPAN', (0, 4), (6, 4)),   # DAILY TIME RECORD left
+            ('SPAN', (8, 4), (14, 4)),  # DAILY TIME RECORD right
+            
+            ('SPAN', (0, 5), (6, 5)),   # -----o0o----- left
+            ('SPAN', (8, 5), (14, 5)),  # -----o0o----- right
+            
+            ('SPAN', (0, 6), (6, 6)),   # Employee Name left
+            ('SPAN', (8, 6), (14, 6)),  # Employee Name right
+            
+            ('SPAN', (0, 7), (6, 7)),   # (Name) left
+            ('SPAN', (8, 7), (14, 7)),  # (Name) right
+            
+            # Period and hours row (row 8)
+            ('SPAN', (0, 8), (4, 8)),   # Period left
+            ('SPAN', (5, 8), (6, 8)),   # Hours left
+            ('SPAN', (8, 8), (12, 8)),  # Period right
+            ('SPAN', (13, 8), (14, 8)), # Hours right
+            
+            # Table headers (rows 9-10)
+            ('SPAN', (0, 9), (0, 10)),  # Day column left
+            ('SPAN', (1, 9), (2, 9)),   # A.M. left
+            ('SPAN', (3, 9), (4, 9)),   # P.M. left
+            ('SPAN', (5, 9), (6, 9)),   # Undertime left
+            
+            ('SPAN', (8, 9), (8, 10)),  # Day column right
+            ('SPAN', (9, 9), (10, 9)),  # A.M. right
+            ('SPAN', (11, 9), (12, 9)), # P.M. right
+            ('SPAN', (13, 9), (14, 9)), # Undertime right
+            
+            # Merge SATURDAY/SUNDAY cells
+        ]))
+        
+        # Add specific spans for weekend days
+        for day_num in range(1, 32):
+            row_idx = 10 + day_num  # Starting from row 11 (0-indexed)
+            
             if day_num <= len(edited_df):
                 row_data = edited_df.iloc[day_num - 1]
                 
-                # ===== LEFT DTR =====
-                # Day number
-                day_cell_left = ws.cell(row=current_row, column=1, value=day_num)
-                day_cell_left.alignment = center
-                day_cell_left.font = font_arial_8
-                day_cell_left.border = border
-                
-                # Time entries for LEFT DTR
                 if str(row_data["AM In"]).strip() in ["SATURDAY", "SUNDAY"]:
-                    # Merge for SATURDAY/SUNDAY
-                    sat_cell = ws.cell(row=current_row, column=2, value=str(row_data["AM In"]).strip())
-                    ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=5)
-                    sat_cell.alignment = center
-                    sat_cell.font = font_arial_8
-                    sat_cell.border = border
-                    
-                    # Add borders to merged cells
-                    for col in [3, 4, 5]:
-                        ws.cell(row=current_row, column=col).border = border
-                else:
-                    # Regular day - fill all time cells
-                    for col_offset, col_name in [(0, "AM In"), (1, "AM Out"), (2, "PM In"), (3, "PM Out")]:
-                        col_idx = 2 + col_offset
-                        cell = ws.cell(row=current_row, column=col_idx)
-                        val = row_data[col_name]
-                        cell.value = "" if pd.isna(val) else str(val)
-                        cell.alignment = center
-                        cell.font = font_arial_8
-                        cell.border = border
-                
-                # Undertime columns for LEFT DTR (empty)
-                for col in [7, 8]:  # Hours and Minutes columns
-                    cell = ws.cell(row=current_row, column=col)
-                    cell.value = ""
-                    cell.alignment = center
-                    cell.font = font_arial_8
-                    cell.border = border
-                
-                # Empty cells
-                ws.cell(row=current_row, column=6).border = border  # Spacer
-                ws.cell(row=current_row, column=9).border = border  # Empty
-                
-                # ===== RIGHT DTR =====
-                # Day number
-                day_cell_right = ws.cell(row=current_row, column=12, value=day_num)
-                day_cell_right.alignment = center
-                day_cell_right.font = font_arial_8
-                day_cell_right.border = border
-                
-                # Time entries for RIGHT DTR
-                if str(row_data["AM In"]).strip() in ["SATURDAY", "SUNDAY"]:
-                    # Merge for SATURDAY/SUNDAY
-                    sat_cell = ws.cell(row=current_row, column=13, value=str(row_data["AM In"]).strip())
-                    ws.merge_cells(start_row=current_row, start_column=13, end_row=current_row, end_column=16)
-                    sat_cell.alignment = center
-                    sat_cell.font = font_arial_8
-                    sat_cell.border = border
-                    
-                    # Add borders to merged cells
-                    for col in [14, 15, 16]:
-                        ws.cell(row=current_row, column=col).border = border
-                else:
-                    # Regular day - fill all time cells
-                    for col_offset, col_name in [(0, "AM In"), (1, "AM Out"), (2, "PM In"), (3, "PM Out")]:
-                        col_idx = 13 + col_offset
-                        cell = ws.cell(row=current_row, column=col_idx)
-                        val = row_data[col_name]
-                        cell.value = "" if pd.isna(val) else str(val)
-                        cell.alignment = center
-                        cell.font = font_arial_8
-                        cell.border = border
-                
-                # Undertime columns for RIGHT DTR (empty)
-                for col in [18, 19]:  # Hours and Minutes columns
-                    cell = ws.cell(row=current_row, column=col)
-                    cell.value = ""
-                    cell.alignment = center
-                    cell.font = font_arial_8
-                    cell.border = border
-                
-                # Empty cells
-                ws.cell(row=current_row, column=17).border = border  # Spacer
-                ws.cell(row=current_row, column=20).border = border  # Empty
-                
-            else:
-                # Empty row if day doesn't exist (fill with borders)
-                for col in range(1, 11):  # Left DTR columns
-                    cell = ws.cell(row=current_row, column=col)
-                    cell.value = ""
-                    cell.border = border
-                
-                for col in range(12, 22):  # Right DTR columns
-                    cell = ws.cell(row=current_row, column=col)
-                    cell.value = ""
-                    cell.border = border
+                    # Left DTR
+                    table.setStyle(TableStyle([
+                        ('SPAN', (1, row_idx), (4, row_idx)),  # Merge A.M. and P.M. columns
+                    ]))
+                    # Right DTR
+                    table.setStyle(TableStyle([
+                        ('SPAN', (9, row_idx), (12, row_idx)),  # Merge A.M. and P.M. columns
+                    ]))
+        
+        # TOTAL row spans
+        total_row_idx = 10 + 31 + 1  # After 31 days
+        table.setStyle(TableStyle([
+            ('SPAN', (0, total_row_idx), (4, total_row_idx)),  # TOTAL left
+            ('SPAN', (8, total_row_idx), (12, total_row_idx)), # TOTAL right
+        ]))
+        
+        # Footer spans
+        footer_start = total_row_idx + 3
+        table.setStyle(TableStyle([
+            # Certification
+            ('SPAN', (0, footer_start), (6, footer_start)),    # Left
+            ('SPAN', (8, footer_start), (14, footer_start)),   # Right
             
-            current_row += 1
+            # Signature line
+            ('SPAN', (0, footer_start + 2), (6, footer_start + 2)),    # Left
+            ('SPAN', (8, footer_start + 2), (14, footer_start + 2)),   # Right
+            
+            # VERIFIED text
+            ('SPAN', (0, footer_start + 4), (6, footer_start + 4)),    # Left
+            ('SPAN', (8, footer_start + 4), (14, footer_start + 4)),   # Right
+            
+            # Principal signature line
+            ('SPAN', (0, footer_start + 6), (6, footer_start + 6)),    # Left
+            ('SPAN', (8, footer_start + 6), (14, footer_start + 6)),   # Right
+            
+            # Principal III
+            ('SPAN', (0, footer_start + 7), (6, footer_start + 7)),    # Left
+            ('SPAN', (8, footer_start + 7), (14, footer_start + 7)),   # Right
+        ]))
         
-        # ===== TOTAL ROW FOR BOTH DTRs =====
-        # LEFT DTR TOTAL
-        total_left = ws.cell(row=current_row, column=1, value="TOTAL")
-        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=5)
-        total_left.alignment = center
-        total_left.font = font_arial_8_bold
-        total_left.border = border
+        # Add borders to table cells
+        border_style = ('GRID', (0, 9), (6, total_row_idx), 0.5, colors.black)  # Left DTR table
+        table.setStyle(TableStyle([border_style]))
         
-        # Add borders to remaining cells in LEFT DTR
-        for col in range(6, 11):
-            cell = ws.cell(row=current_row, column=col)
-            cell.value = ""
-            cell.border = border
+        border_style_right = ('GRID', (8, 9), (14, total_row_idx), 0.5, colors.black)  # Right DTR table
+        table.setStyle(TableStyle([border_style_right]))
         
-        # RIGHT DTR TOTAL
-        total_right = ws.cell(row=current_row, column=12, value="TOTAL")
-        ws.merge_cells(start_row=current_row, start_column=12, end_row=current_row, end_column=16)
-        total_right.alignment = center
-        total_right.font = font_arial_8_bold
-        total_right.border = border
+        # Add border to spacer column to separate DTRs
+        table.setStyle(TableStyle([
+            ('LINEAFTER', (6, 0), (6, -1), 0.5, colors.white),  # White line as spacer
+        ]))
         
-        # Add borders to remaining cells in RIGHT DTR
-        for col in range(17, 22):
-            cell = ws.cell(row=current_row, column=col)
-            cell.value = ""
-            cell.border = border
+        # Build PDF
+        elements = []
+        elements.append(table)
         
-        # ===== FOOTER SECTION =====
-        footer_start = current_row + 2
+        # Build the PDF
+        doc.build(elements)
         
-        # Certification text (spans both DTRs)
-        cert_cell = ws.cell(row=footer_start, column=1, 
-                           value="I certify on my honor that the above is a true and correct report of the hours of work performed, record of which was made daily at the time of arrival and departure from office.")
-        ws.merge_cells(start_row=footer_start, start_column=1, end_row=footer_start, end_column=21)
-        cert_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cert_cell.font = font_arial_8_italic
-        
-        # Signature line (2 spaces down)
-        signature_line_row = footer_start + 4
-        
-        # Horizontal line for signature (centered, spans both DTRs)
-        sig_line = ws.cell(row=signature_line_row, column=8, value="_________________________")
-        ws.merge_cells(start_row=signature_line_row, start_column=8, end_row=signature_line_row, end_column=14)
-        sig_line.alignment = center
-        sig_line.font = font_arial_8
-        
-        # "VERIFIED as to the prescribed office hours:" (1 space down)
-        verified_row = signature_line_row + 2
-        verified_cell = ws.cell(row=verified_row, column=1, value="VERIFIED as to the prescribed office hours:")
-        ws.merge_cells(start_row=verified_row, start_column=1, end_row=verified_row, end_column=21)
-        verified_cell.alignment = center
-        verified_cell.font = font_arial_8
-        
-        # Space for principal signature
-        principal_sig_row = verified_row + 3
-        
-        # Principal III (centered, should be near bottom margin)
-        principal_cell = ws.cell(row=principal_sig_row, column=8, value="Principal III")
-        ws.merge_cells(start_row=principal_sig_row, start_column=8, end_row=principal_sig_row, end_column=14)
-        principal_cell.alignment = center
-        principal_cell.font = font_arial_8_bold
-        
-        # Add horizontal line above Principal III
-        for col in range(8, 15):
-            ws.cell(row=principal_sig_row-1, column=col).border = Border(top=thin)
-        
-        final_row = principal_sig_row + 1
-
-        # ===== PAGE SETUP =====
-        ws.page_setup.paperSize = ws.PAPERSIZE_A4
-        ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
-        
-        # Set margins as per specification (convert cm to inches)
-        # 1 cm = 0.393701 inches
-        ws.page_margins.left = 1.27 * 0.393701  # 1.27 cm to inches
-        ws.page_margins.right = 1.27 * 0.393701  # 1.27 cm to inches
-        ws.page_margins.top = 1.9 * 0.393701    # 1.9 cm to inches
-        ws.page_margins.bottom = 0.49 * 0.393701  # 0.49 cm to inches
-        ws.page_margins.header = 0.3
-        ws.page_margins.footer = 0.3
-        
-        ws.page_setup.horizontalCentered = True
-        ws.page_setup.verticalCentered = False
-        
-        # Set print area to ensure everything fits
-        ws.print_area = f'A1:U{final_row}'
-        
-        # Scale to fit (if needed)
-        ws.page_setup.fitToHeight = 0
-        ws.page_setup.fitToWidth = 1
-        ws.page_setup.scale = 100  # 100% scale
-
-        # ===== SAVE AND DOWNLOAD =====
-        buffer = BytesIO()
-        wb.save(buffer)
+        # Get PDF data
         buffer.seek(0)
-
-        st.success("✅ DTR Excel file generated successfully!")
+        pdf_data = buffer.getvalue()
+        
+        st.success("✅ DTR PDF file generated successfully!")
         
         # Create safe filename
         safe_name = "".join([c if c.isalnum() or c in "._- " else "_" for c in employee_name])
         
         st.download_button(
-            "📥 Download Excel File",
-            buffer.getvalue(),
-            file_name=f"DTR_CSForm48_{safe_name}_{month}_{year}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            "📥 Download PDF File",
+            pdf_data,
+            file_name=f"DTR_CSForm48_{safe_name}_{month}_{year}.pdf",
+            mime="application/pdf"
         )
         
-        # Show preview note
         st.info("""
         **📝 Document Specifications:**
+        - Format: **PDF (Portable Document Format)**
         - Paper: **A4 Portrait**
         - Margins: Top 1.9cm, Bottom 0.49cm, Left/Right 1.27cm
-        - Font: **Arial** throughout
         - Two identical DTRs side by side
         - Each DTR contains complete 1-31 days
-        - Proper formatting as per Civil Service Form 48
+        - Proper table borders and formatting
+        - Ready to print
         """)
         
     except Exception as e:
-        st.error(f"❌ Error generating Excel file: {str(e)}")
+        st.error(f"❌ Error generating PDF file: {str(e)}")
         import traceback
         st.code(traceback.format_exc())
