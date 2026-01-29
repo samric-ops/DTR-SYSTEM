@@ -67,172 +67,169 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
         thin = Side(style="thin")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
         
-        # Use smaller font for compact design
         small_font = Font(size=9)
         header_font = Font(bold=True, size=10)
 
-        # Set narrower column widths for half-page format
-        # Total width for 7 columns should fit half of A4
-        widths = [4, 8, 8, 8, 8, 8, 8]  # Narrower columns
+        # Set column widths
+        widths = [4, 8, 8, 8, 8, 8, 8]
         for i, w in enumerate(widths, 1):
             col_letter = chr(64 + i)
             ws.column_dimensions[col_letter].width = w
 
-        # -------- FIRST DTR (LEFT SIDE) --------
-        start_row = 1
+        current_row = 1
+
+        # -------- FIRST DTR (TOP HALF) --------
         
-        # HEADER FOR FIRST DTR
-        # Line 1: REPUBLIC OF THE PHILIPPINES (centered)
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "REPUBLIC OF THE PHILIPPINES"
+        # HEADER - SET VALUES FIRST, THEN MERGE
+        # Line 1
+        cell = ws.cell(row=current_row, column=1, value="REPUBLIC OF THE PHILIPPINES")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 1
+        current_row += 1
         
-        # Line 2: Department of Education (centered)
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "Department of Education"
+        # Line 2
+        cell = ws.cell(row=current_row, column=1, value="Department of Education")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 1
+        current_row += 1
         
-        # Line 3: Division of Davao del Sur (centered)
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "Division of Davao del Sur"
+        # Line 3
+        cell = ws.cell(row=current_row, column=1, value="Division of Davao del Sur")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 1
+        current_row += 1
         
-        # Line 4: Manual National High School (centered)
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "Manual National High School"
+        # Line 4
+        cell = ws.cell(row=current_row, column=1, value="Manual National High School")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 2  # Extra space
+        current_row += 2
         
-        # Line with Civil Service Form and Employee No.
-        # Left side: Civil Service Form No. 48
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=3)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "Civil Service Form No. 48"
-        cell.alignment = left
-        cell.font = bold
+        # Civil Service Form and Employee No. - SET BOTH FIRST
+        # Left side
+        cell_left = ws.cell(row=current_row, column=1, value="Civil Service Form No. 48")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=3)
+        cell_left.alignment = left
+        cell_left.font = bold
         
-        # Right side: Employee No. and number
-        ws.merge_cells(start_row=start_row, start_column=5, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=5)
-        cell.value = f"Employee No.    {employee_no}"
-        cell.alignment = right
-        cell.font = bold
-        start_row += 2
+        # Right side
+        cell_right = ws.cell(row=current_row, column=5, value=f"Employee No.    {employee_no}")
+        ws.merge_cells(start_row=current_row, start_column=5, end_row=current_row, end_column=7)
+        cell_right.alignment = right
+        cell_right.font = bold
+        current_row += 2
         
-        # DAILY TIME RECORD (centered)
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "DAILY TIME RECORD"
+        # DAILY TIME RECORD
+        cell = ws.cell(row=current_row, column=1, value="DAILY TIME RECORD")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = Font(bold=True, size=12)
-        start_row += 1
+        current_row += 1
         
         # ---o0o--- line
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "---o0o---"
+        cell = ws.cell(row=current_row, column=1, value="---o0o---")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 2
+        current_row += 2
         
         # Employee Name
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = employee_name
+        cell = ws.cell(row=current_row, column=1, value=employee_name)
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 1
+        current_row += 1
         
         # "(Name)" label
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "(Name)"
+        cell = ws.cell(row=current_row, column=1, value="(Name)")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 1
+        current_row += 1
         
-        # "For the month of" with month and year
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = f"For the month of __________ {month} __________ {year}"
+        # "For the month of"
+        cell = ws.cell(row=current_row, column=1, value=f"For the month of __________ {month} __________ {year}")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 2
+        current_row += 2
         
         # Official hours section
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "Official hours for arrival and departure"
+        cell = ws.cell(row=current_row, column=1, value="Official hours for arrival and departure")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 1
+        current_row += 1
         
         # Regular days hours
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = f"Regular days: {am_hours} / {pm_hours}"
+        cell = ws.cell(row=current_row, column=1, value=f"Regular days: {am_hours} / {pm_hours}")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 1
+        current_row += 1
         
         # Saturdays
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = f"Saturdays: {saturday_hours}"
+        cell = ws.cell(row=current_row, column=1, value=f"Saturdays: {saturday_hours}")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 2
+        current_row += 2
         
         # -------- TABLE HEADER FOR FIRST DTR --------
-        # Top row headers
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row + 1, end_column=1)  # Day
-        ws.merge_cells(start_row=start_row, start_column=2, end_row=start_row, end_column=3)  # A.M.
-        ws.merge_cells(start_row=start_row, start_column=4, end_row=start_row, end_column=5)  # P.M.
-        ws.merge_cells(start_row=start_row, start_column=6, end_row=start_row, end_column=7)  # Undertime
+        # IMPORTANT: Set values in TOP-LEFT cells BEFORE merging
         
-        # Main headers
-        ws.cell(row=start_row, column=1, value="Day").alignment = center
-        ws.cell(row=start_row, column=1).font = header_font
+        # Day header (will be merged vertically)
+        day_cell = ws.cell(row=current_row, column=1, value="Day")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row + 1, end_column=1)
+        day_cell.alignment = center
+        day_cell.font = header_font
         
-        ws.cell(row=start_row, column=2, value="A.M.").alignment = center
-        ws.cell(row=start_row, column=2).font = header_font
+        # A.M. header (will be merged horizontally)
+        am_cell = ws.cell(row=current_row, column=2, value="A.M.")
+        ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=3)
+        am_cell.alignment = center
+        am_cell.font = header_font
         
-        ws.cell(row=start_row, column=4, value="P.M.").alignment = center
-        ws.cell(row=start_row, column=4).font = header_font
+        # P.M. header (will be merged horizontally)
+        pm_cell = ws.cell(row=current_row, column=4, value="P.M.")
+        ws.merge_cells(start_row=current_row, start_column=4, end_row=current_row, end_column=5)
+        pm_cell.alignment = center
+        pm_cell.font = header_font
         
-        ws.cell(row=start_row, column=6, value="Undertime").alignment = center
-        ws.cell(row=start_row, column=6).font = header_font
+        # Undertime header (will be merged horizontally)
+        under_cell = ws.cell(row=current_row, column=6, value="Undertime")
+        ws.merge_cells(start_row=current_row, start_column=6, end_row=current_row, end_column=7)
+        under_cell.alignment = center
+        under_cell.font = header_font
         
         # Second row sub-headers
-        start_row += 1
+        current_row += 1
         
         sub_headers = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
         for col_idx in range(1, 8):
-            cell = ws.cell(row=start_row, column=col_idx)
-            cell.value = sub_headers[col_idx - 1]
-            cell.alignment = center
-            cell.font = Font(bold=True, size=8)
-            cell.border = border
+            # IMPORTANT: Don't touch column 1 - it's part of vertical merge
+            if col_idx != 1:
+                cell = ws.cell(row=current_row, column=col_idx)
+                cell.value = sub_headers[col_idx - 1]
+                cell.alignment = center
+                cell.font = Font(bold=True, size=8)
+                cell.border = border
+            else:
+                # Just add border to column 1 (already has "Day" value from merged cell)
+                ws.cell(row=current_row, column=1).border = border
         
-        start_row += 1
+        current_row += 1
         
         # -------- TABLE DATA FOR FIRST DTR (First 15 days) --------
         first_half = edited_df.iloc[:15] if len(edited_df) > 15 else edited_df
         
         for _, row_data in first_half.iterrows():
             # Day column
-            day_cell = ws.cell(row=start_row, column=1)
+            day_cell = ws.cell(row=current_row, column=1)
             day_val = row_data["Day"]
             day_cell.value = int(day_val) if not pd.isna(day_val) else ""
             day_cell.alignment = center
@@ -240,19 +237,19 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
             day_cell.font = small_font
 
             if str(row_data["AM In"]).strip() in ["SATURDAY", "SUNDAY"]:
-                ws.merge_cells(start_row=start_row, start_column=2, end_row=start_row, end_column=5)
-                merged_cell = ws.cell(row=start_row, column=2)
-                merged_cell.value = str(row_data["AM In"]).strip()
-                merged_cell.alignment = center
-                merged_cell.border = border
-                merged_cell.font = small_font
+                # SET VALUE FIRST, then merge
+                sat_cell = ws.cell(row=current_row, column=2, value=str(row_data["AM In"]).strip())
+                ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=5)
+                sat_cell.alignment = center
+                sat_cell.border = border
+                sat_cell.font = small_font
                 
+                # Add borders to other cells in merged range
                 for col in [3, 4, 5]:
-                    cell = ws.cell(row=start_row, column=col)
-                    cell.border = border
+                    ws.cell(row=current_row, column=col).border = border
             else:
                 for col_idx, col_name in [(2, "AM In"), (3, "AM Out"), (4, "PM In"), (5, "PM Out")]:
-                    cell = ws.cell(row=start_row, column=col_idx)
+                    cell = ws.cell(row=current_row, column=col_idx)
                     val = row_data[col_name]
                     cell.value = "" if pd.isna(val) else str(val)
                     cell.alignment = center
@@ -261,179 +258,171 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
             # Undertime columns
             for col in [6, 7]:
-                cell = ws.cell(row=start_row, column=col)
+                cell = ws.cell(row=current_row, column=col)
                 cell.value = ""
                 cell.alignment = center
                 cell.border = border
                 cell.font = small_font
 
-            start_row += 1
+            current_row += 1
         
-        # Add remaining rows if less than 15 days
+        # Add empty rows if less than 15 days
         for _ in range(len(first_half), 15):
             for col in range(1, 8):
-                cell = ws.cell(row=start_row, column=col)
+                cell = ws.cell(row=current_row, column=col)
                 cell.value = ""
                 cell.border = border
                 cell.font = small_font
-            start_row += 1
+            current_row += 1
         
         # TOTAL row for first DTR
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=5)
-        total_cell = ws.cell(row=start_row, column=1)
-        total_cell.value = "TOTAL"
+        total_cell = ws.cell(row=current_row, column=1, value="TOTAL")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=5)
         total_cell.alignment = center
         total_cell.font = bold
         total_cell.border = border
         
         for col in [6, 7]:
-            cell = ws.cell(row=start_row, column=col)
+            cell = ws.cell(row=current_row, column=col)
             cell.value = ""
             cell.border = border
         
-        start_row += 4  # Space for second DTR
+        current_row += 4  # Space between DTRs
         
-        # -------- SECOND DTR (RIGHT SIDE - SAME FORMAT) --------
-        # Repeat the same structure but at column H onward (for second half of page)
-        # For simplicity, we'll create it below the first one
-        
-        # Add separator line
+        # -------- SEPARATOR LINE --------
         for col in range(1, 8):
-            ws.cell(row=start_row, column=col).value = "─" * 15
+            ws.cell(row=current_row, column=col, value="─" * 15)
+        current_row += 2
         
-        start_row += 2
+        # -------- SECOND DTR (BOTTOM HALF) --------
+        # HEADER FOR SECOND DTR - SAME PATTERN: SET VALUE FIRST, THEN MERGE
         
-        # HEADER FOR SECOND DTR
-        # Line 1: REPUBLIC OF THE PHILIPPINES
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "REPUBLIC OF THE PHILIPPINES"
+        # Line 1
+        cell = ws.cell(row=current_row, column=1, value="REPUBLIC OF THE PHILIPPINES")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 1
+        current_row += 1
         
-        # Line 2-4: Same as first DTR
+        # Lines 2-4
         for text in ["Department of Education", "Division of Davao del Sur", "Manual National High School"]:
-            ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-            cell = ws.cell(row=start_row, column=1)
-            cell.value = text
+            cell = ws.cell(row=current_row, column=1, value=text)
+            ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
             cell.alignment = center
             cell.font = bold
-            start_row += 1
+            current_row += 1
         
-        start_row += 1  # Extra space
+        current_row += 1
         
         # Civil Service Form and Employee No.
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=3)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "Civil Service Form No. 48"
-        cell.alignment = left
-        cell.font = bold
+        cell_left = ws.cell(row=current_row, column=1, value="Civil Service Form No. 48")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=3)
+        cell_left.alignment = left
+        cell_left.font = bold
         
-        ws.merge_cells(start_row=start_row, start_column=5, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=5)
-        cell.value = f"Employee No.    {employee_no}"
-        cell.alignment = right
-        cell.font = bold
-        start_row += 2
+        cell_right = ws.cell(row=current_row, column=5, value=f"Employee No.    {employee_no}")
+        ws.merge_cells(start_row=current_row, start_column=5, end_row=current_row, end_column=7)
+        cell_right.alignment = right
+        cell_right.font = bold
+        current_row += 2
         
         # DAILY TIME RECORD
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "DAILY TIME RECORD"
+        cell = ws.cell(row=current_row, column=1, value="DAILY TIME RECORD")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = Font(bold=True, size=12)
-        start_row += 1
+        current_row += 1
         
         # ---o0o--- line
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "---o0o---"
+        cell = ws.cell(row=current_row, column=1, value="---o0o---")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 2
+        current_row += 2
         
         # Employee Name
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = employee_name
+        cell = ws.cell(row=current_row, column=1, value=employee_name)
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = bold
-        start_row += 1
+        current_row += 1
         
         # "(Name)" label
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "(Name)"
+        cell = ws.cell(row=current_row, column=1, value="(Name)")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 1
+        current_row += 1
         
         # "For the month of"
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = f"For the month of __________ {month} __________ {year}"
+        cell = ws.cell(row=current_row, column=1, value=f"For the month of __________ {month} __________ {year}")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 2
+        current_row += 2
         
         # Official hours
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "Official hours for arrival and departure"
+        cell = ws.cell(row=current_row, column=1, value="Official hours for arrival and departure")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 1
+        current_row += 1
         
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = f"Regular days: {am_hours} / {pm_hours}"
+        cell = ws.cell(row=current_row, column=1, value=f"Regular days: {am_hours} / {pm_hours}")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 1
+        current_row += 1
         
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = f"Saturdays: {saturday_hours}"
+        cell = ws.cell(row=current_row, column=1, value=f"Saturdays: {saturday_hours}")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
         cell.alignment = center
         cell.font = small_font
-        start_row += 2
+        current_row += 2
         
         # -------- TABLE HEADER FOR SECOND DTR --------
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row + 1, end_column=1)
-        ws.merge_cells(start_row=start_row, start_column=2, end_row=start_row, end_column=3)
-        ws.merge_cells(start_row=start_row, start_column=4, end_row=start_row, end_column=5)
-        ws.merge_cells(start_row=start_row, start_column=6, end_row=start_row, end_column=7)
+        # SET VALUES FIRST, THEN MERGE
+        day_cell = ws.cell(row=current_row, column=1, value="Day")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row + 1, end_column=1)
+        day_cell.alignment = center
+        day_cell.font = header_font
         
-        ws.cell(row=start_row, column=1, value="Day").alignment = center
-        ws.cell(row=start_row, column=1).font = header_font
+        am_cell = ws.cell(row=current_row, column=2, value="A.M.")
+        ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=3)
+        am_cell.alignment = center
+        am_cell.font = header_font
         
-        ws.cell(row=start_row, column=2, value="A.M.").alignment = center
-        ws.cell(row=start_row, column=2).font = header_font
+        pm_cell = ws.cell(row=current_row, column=4, value="P.M.")
+        ws.merge_cells(start_row=current_row, start_column=4, end_row=current_row, end_column=5)
+        pm_cell.alignment = center
+        pm_cell.font = header_font
         
-        ws.cell(row=start_row, column=4, value="P.M.").alignment = center
-        ws.cell(row=start_row, column=4).font = header_font
+        under_cell = ws.cell(row=current_row, column=6, value="Undertime")
+        ws.merge_cells(start_row=current_row, start_column=6, end_row=current_row, end_column=7)
+        under_cell.alignment = center
+        under_cell.font = header_font
         
-        ws.cell(row=start_row, column=6, value="Undertime").alignment = center
-        ws.cell(row=start_row, column=6).font = header_font
+        current_row += 1
         
-        start_row += 1
-        
+        # Sub-headers
         for col_idx in range(1, 8):
-            cell = ws.cell(row=start_row, column=col_idx)
-            cell.value = sub_headers[col_idx - 1]
-            cell.alignment = center
-            cell.font = Font(bold=True, size=8)
-            cell.border = border
+            if col_idx != 1:
+                cell = ws.cell(row=current_row, column=col_idx)
+                cell.value = sub_headers[col_idx - 1]
+                cell.alignment = center
+                cell.font = Font(bold=True, size=8)
+                cell.border = border
+            else:
+                ws.cell(row=current_row, column=1).border = border
         
-        start_row += 1
+        current_row += 1
         
         # -------- TABLE DATA FOR SECOND DTR (Days 16-31) --------
         second_half = edited_df.iloc[15:] if len(edited_df) > 15 else pd.DataFrame()
         
         if len(second_half) > 0:
             for _, row_data in second_half.iterrows():
-                day_cell = ws.cell(row=start_row, column=1)
+                day_cell = ws.cell(row=current_row, column=1)
                 day_val = row_data["Day"]
                 day_cell.value = int(day_val) if not pd.isna(day_val) else ""
                 day_cell.alignment = center
@@ -441,15 +430,14 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
                 day_cell.font = small_font
 
                 if str(row_data["AM In"]).strip() in ["SATURDAY", "SUNDAY"]:
-                    ws.merge_cells(start_row=start_row, start_column=2, end_row=start_row, end_column=5)
-                    merged_cell = ws.cell(row=start_row, column=2)
-                    merged_cell.value = str(row_data["AM In"]).strip()
-                    merged_cell.alignment = center
-                    merged_cell.border = border
-                    merged_cell.font = small_font
+                    sat_cell = ws.cell(row=current_row, column=2, value=str(row_data["AM In"]).strip())
+                    ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=5)
+                    sat_cell.alignment = center
+                    sat_cell.border = border
+                    sat_cell.font = small_font
                 else:
                     for col_idx, col_name in [(2, "AM In"), (3, "AM Out"), (4, "PM In"), (5, "PM Out")]:
-                        cell = ws.cell(row=start_row, column=col_idx)
+                        cell = ws.cell(row=current_row, column=col_idx)
                         val = row_data[col_name]
                         cell.value = "" if pd.isna(val) else str(val)
                         cell.alignment = center
@@ -457,62 +445,58 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
                         cell.font = small_font
 
                 for col in [6, 7]:
-                    cell = ws.cell(row=start_row, column=col)
+                    cell = ws.cell(row=current_row, column=col)
                     cell.value = ""
                     cell.alignment = center
                     cell.border = border
                     cell.font = small_font
 
-                start_row += 1
+                current_row += 1
         
         # Fill remaining rows
         rows_filled = len(second_half)
         for _ in range(rows_filled, 15):
             for col in range(1, 8):
-                cell = ws.cell(row=start_row, column=col)
+                cell = ws.cell(row=current_row, column=col)
                 cell.value = ""
                 cell.border = border
                 cell.font = small_font
-            start_row += 1
+            current_row += 1
         
         # TOTAL row for second DTR
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row, end_column=5)
-        total_cell = ws.cell(row=start_row, column=1)
-        total_cell.value = "TOTAL"
+        total_cell = ws.cell(row=current_row, column=1, value="TOTAL")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=5)
         total_cell.alignment = center
         total_cell.font = bold
         total_cell.border = border
         
         for col in [6, 7]:
-            cell = ws.cell(row=start_row, column=col)
+            cell = ws.cell(row=current_row, column=col)
             cell.value = ""
             cell.border = border
         
-        start_row += 4
+        current_row += 4
         
         # -------- FOOTER (CERTIFICATION) --------
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row + 2, end_column=7)
-        footer_cell = ws.cell(row=start_row, column=1)
-        footer_cell.value = (
-            "I certify on my honor that the above is a true and correct report of the\n"
-            "hours of work performed, record of which was made daily at the time of\n"
-            "arrival and departure from office."
-        )
+        footer_cell = ws.cell(row=current_row, column=1, 
+                              value="I certify on my honor that the above is a true and correct report of the\n"
+                                    "hours of work performed, record of which was made daily at the time of\n"
+                                    "arrival and departure from office.")
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row + 2, end_column=7)
         footer_cell.alignment = center
         footer_cell.font = small_font
 
-        start_row += 4
+        current_row += 4
         
         # Signature line
-        ws.merge_cells(start_row=start_row, start_column=5, end_row=start_row, end_column=7)
-        signature_cell = ws.cell(row=start_row, column=5)
-        signature_cell.value = "Principal III"
+        signature_cell = ws.cell(row=current_row, column=5, value="Principal III")
+        ws.merge_cells(start_row=current_row, start_column=5, end_row=current_row, end_column=7)
         signature_cell.alignment = center
         signature_cell.font = small_font
 
-        # -------- PAGE SETUP FOR HALF-PAGE --------
+        # -------- PAGE SETUP --------
         ws.page_setup.paperSize = ws.PAPERSIZE_A4
-        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE  # Landscape for two DTRs side by side
+        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
         ws.page_setup.fitToHeight = 1
         ws.page_setup.fitToWidth = 1
         ws.page_margins.left = 0.3
@@ -520,10 +504,6 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
         ws.page_margins.top = 0.5
         ws.page_margins.bottom = 0.5
         ws.page_setup.horizontalCentered = True
-        ws.page_setup.verticalCentered = False
-        
-        # Set print area for two DTRs per page
-        ws.print_area = f'A1:G{start_row}'
 
         # -------- SAVE AND DOWNLOAD --------
         buffer = BytesIO()
@@ -532,7 +512,6 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
         st.success("✅ DTR Excel file generated successfully!")
         
-        # Create safe filename
         safe_name = "".join([c if c.isalnum() or c in "._- " else "_" for c in employee_name])
         
         st.download_button(
@@ -544,4 +523,5 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
         
     except Exception as e:
         st.error(f"❌ Error generating Excel file: {str(e)}")
-        st.info("Please check your inputs and try again.")
+        import traceback
+        st.code(traceback.format_exc())
