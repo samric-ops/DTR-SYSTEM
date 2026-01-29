@@ -70,10 +70,12 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
     r = 1
 
+    # ---------- REVISED write_merged FUNCTION ----------
     def write_merged(text, rows=1, is_bold=True):
-        global r
-        ws.merge_cells(start_row=r, start_column=1, end_row=r + rows - 1, end_column=7)
-        cell = ws.cell(r, 1)
+        nonlocal r
+        start_row = r
+        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row + rows - 1, end_column=7)
+        cell = ws.cell(start_row, 1)
         cell.value = "" if text is None else str(text)
         cell.alignment = center
         if is_bold:
@@ -85,17 +87,17 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     write_merged("Department of Education")
     write_merged("Division of Davao del Sur")
     write_merged("MANUAL NATIONAL HIGH SCHOOL")
-    r += 1
+    write_merged("", rows=1, is_bold=False)  # Empty row instead of r += 1
     write_merged("DAILY TIME RECORD")
     write_merged("-----o0o-----")
-    r += 1
+    write_merged("", rows=1, is_bold=False)  # Empty row instead of r += 1
     write_merged(f"Name: {employee_name}")
     write_merged(f"For the month of: {month} {year}")
-    r += 1
+    write_merged("", rows=1, is_bold=False)  # Empty row
     write_merged("Official hours for arrival and departure")
     write_merged(f"Regular days: {am_hours} / {pm_hours}")
     write_merged(f"Saturdays: {saturday_hours}")
-    r += 2
+    write_merged("", rows=2, is_bold=False)  # 2 empty rows
 
     # -------- TABLE HEADER --------
     ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=1)
