@@ -74,26 +74,34 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     # -------- HEADER (DIRECT CODING) --------
     # REPUBLIC OF THE PHILIPPINES
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value="REPUBLIC OF THE PHILIPPINES").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = "REPUBLIC OF THE PHILIPPINES"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # Department of Education
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value="Department of Education").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = "Department of Education"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # Division of Davao del Sur
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value="Division of Davao del Sur").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = "Division of Davao del Sur"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # MANUAL NATIONAL HIGH SCHOOL
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value="MANUAL NATIONAL HIGH SCHOOL").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = "MANUAL NATIONAL HIGH SCHOOL"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # Empty row
@@ -102,14 +110,18 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     
     # DAILY TIME RECORD
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value="DAILY TIME RECORD").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = "DAILY TIME RECORD"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # -----o0o-----
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value="-----o0o-----").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = "-----o0o-----"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # Empty row
@@ -118,14 +130,18 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     
     # Name
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value=f"Name: {employee_name}").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = f"Name: {employee_name}"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # For the month of
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value=f"For the month of: {month} {year}").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = f"For the month of: {month} {year}"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # Empty row
@@ -134,20 +150,26 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     
     # Official hours for arrival and departure
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value="Official hours for arrival and departure").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = "Official hours for arrival and departure"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # Regular days
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value=f"Regular days: {am_hours} / {pm_hours}").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = f"Regular days: {am_hours} / {pm_hours}"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # Saturdays
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
-    ws.cell(row=r, column=1, value=f"Saturdays: {saturday_hours}").alignment = center
-    ws.cell(row=r, column=1).font = bold
+    cell = ws.cell(row=r, column=1)
+    cell.value = f"Saturdays: {saturday_hours}"
+    cell.alignment = center
+    cell.font = bold
     r += 1
     
     # 2 empty rows
@@ -174,8 +196,10 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     r += 1
     sub_headers = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
     
-    for c, text in enumerate(sub_headers, start=1):
-        cell = ws.cell(row=r, column=c)
+    # FIXED: Simple loop without enumerate issues
+    for col_index in range(1, 8):  # Columns 1 to 7
+        text = sub_headers[col_index - 1]  # Get text from list (0-based index)
+        cell = ws.cell(row=r, column=col_index)
         cell.value = text
         cell.alignment = center
         cell.font = Font(bold=True)
@@ -225,6 +249,7 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
         # Undertime columns (blank by default)
         for c in [6, 7]:
             cell = ws.cell(row=r, column=c)
+            cell.value = ""  # Explicitly set empty value
             cell.alignment = center
             cell.border = border
 
@@ -239,7 +264,10 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     
     # Add border to total row
     for c in range(1, 8):
-        ws.cell(row=r, column=c).border = border
+        cell = ws.cell(row=r, column=c)
+        cell.border = border
+        if c > 5:  # For columns 6 and 7
+            cell.value = ""  # Empty value for undertime columns
 
     r += 3
 
@@ -278,9 +306,13 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     buffer.seek(0)
 
     st.success("✅ DTR Excel file generated successfully!")
+    
+    # Create safe filename
+    safe_name = "".join([c if c.isalnum() or c in "._-" else "_" for c in employee_name])
+    
     st.download_button(
         "📥 Download Excel File",
         buffer.getvalue(),
-        file_name=f"DTR_{employee_name.replace(', ', '_').replace(' ', '_')}_{month}_{year}.xlsx",
+        file_name=f"DTR_{safe_name}_{month}_{year}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
