@@ -74,64 +74,73 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
         # -------- HEADER SECTION --------
         header_texts = [
-            "REPUBLIC OF THE PHILIPPINES",
-            "Department of Education",
-            "Division of Davao del Sur",
-            "MANUAL NATIONAL HIGH SCHOOL",
-            "",  # Empty row
-            "DAILY TIME RECORD",
-            "-----o0o-----",
-            "",  # Empty row
-            f"Name: {employee_name}",
-            f"For the month of: {month} {year}",
-            "",  # Empty row
-            "Official hours for arrival and departure",
-            f"Regular days: {am_hours} / {pm_hours}",
-            f"Saturdays: {saturday_hours}",
-            "",  # Empty row
-            ""   # Empty row
+            ("REPUBLIC OF THE PHILIPPINES", True),
+            ("Department of Education", True),
+            ("Division of Davao del Sur", True),
+            ("MANUAL NATIONAL HIGH SCHOOL", True),
+            ("", False),  # Empty row
+            ("DAILY TIME RECORD", True),
+            ("-----o0o-----", True),
+            ("", False),  # Empty row
+            (f"Name: {employee_name}", True),
+            (f"For the month of: {month} {year}", True),
+            ("", False),  # Empty row
+            ("Official hours for arrival and departure", True),
+            (f"Regular days: {am_hours} / {pm_hours}", True),
+            (f"Saturdays: {saturday_hours}", True),
+            ("", False),  # Empty row
+            ("", False)   # Empty row
         ]
         
-        for text in header_texts:
+        for text, is_bold in header_texts:
+            # Merge cells first
             ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=7)
+            # Get the TOP-LEFT cell of the merged range (this is writable)
             cell = ws.cell(row=current_row, column=1)
             cell.value = text if text is not None else ""
             cell.alignment = center
-            if text and text not in ["", "-----o0o-----"]:
+            if is_bold:
                 cell.font = bold
             current_row += 1
 
         # -------- TABLE HEADER --------
-        # Top row headers
-        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row + 1, end_column=1)
-        ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=3)
-        ws.merge_cells(start_row=current_row, start_column=4, end_row=current_row, end_column=5)
-        ws.merge_cells(start_row=current_row, start_column=6, end_row=current_row, end_column=7)
+        # Top row headers - MERGE FIRST before setting values
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row + 1, end_column=1)  # Day
+        ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=3)  # A.M.
+        ws.merge_cells(start_row=current_row, start_column=4, end_row=current_row, end_column=5)  # P.M.
+        ws.merge_cells(start_row=current_row, start_column=6, end_row=current_row, end_column=7)  # Undertime
 
-        # Main headers
-        header_data = [
-            (1, "Day"),
-            (2, "A.M."),
-            (4, "P.M."),
-            (6, "Undertime")
-        ]
+        # Set values for merged cells - ALWAYS use the TOP-LEFT cell
+        ws.cell(row=current_row, column=1, value="Day").alignment = center
+        ws.cell(row=current_row, column=1).font = bold
         
-        for col, text in header_data:
-            cell = ws.cell(row=current_row, column=col)
-            cell.value = text
-            cell.alignment = center
-            cell.font = bold
+        ws.cell(row=current_row, column=2, value="A.M.").alignment = center
+        ws.cell(row=current_row, column=2).font = bold
+        
+        ws.cell(row=current_row, column=4, value="P.M.").alignment = center
+        ws.cell(row=current_row, column=4).font = bold
+        
+        ws.cell(row=current_row, column=6, value="Undertime").alignment = center
+        ws.cell(row=current_row, column=6).font = bold
 
+        # Second row sub-headers
         current_row += 1
         
-        # Sub-headers
+        # IMPORTANT: When accessing merged cells, always use the top-left cell
+        # Set sub-headers for columns 2-7 (column 1 is merged from previous row)
         sub_headers = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
+        
         for col_idx in range(1, 8):  # Columns 1-7
-            cell = ws.cell(row=current_row, column=col_idx)
-            cell.value = sub_headers[col_idx - 1] if col_idx - 1 < len(sub_headers) else ""
-            cell.alignment = center
-            cell.font = bold
-            cell.border = border
+            # For column 1, it's part of the vertical merge - DON'T overwrite it
+            if col_idx == 1:
+                # Just set the border for the merged cell
+                ws.cell(row=current_row, column=col_idx).border = border
+            else:
+                cell = ws.cell(row=current_row, column=col_idx)
+                cell.value = sub_headers[col_idx - 1]
+                cell.alignment = center
+                cell.font = bold
+                cell.border = border
 
         current_row += 1
 
@@ -144,34 +153,46 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
             day_cell.border = border
 
             # Check if SATURDAY or SUNDAY
-            if row_data["AM In"] in ["SATURDAY", "SUNDAY"]:
+            if str(row_data["AM In"]).strip() in ["SATURDAY", "SUNDAY"]:
+                # Merge cells for SATURDAY/SUNDAY
                 ws.merge_cells(start_row=current_row, start_column=2, end_row=current_row, end_column=5)
+                # Set value in the top-left cell of the merge
                 merged_cell = ws.cell(row=current_row, column=2)
-                merged_cell.value = str(row_data["AM In"])
+                merged_cell.value = str(row_data["AM In"]).strip()
                 merged_cell.alignment = center
                 merged_cell.border = border
+                
+                # Set empty values for other cells in the merged range
+                for col in [3, 4, 5]:
+                    cell = ws.cell(row=current_row, column=col)
+                    cell.border = border
             else:
+                # Regular work day
                 # AM In
                 am_in_cell = ws.cell(row=current_row, column=2)
-                am_in_cell.value = "" if pd.isna(row_data["AM In"]) else str(row_data["AM In"])
+                am_in_val = row_data["AM In"]
+                am_in_cell.value = "" if pd.isna(am_in_val) else str(am_in_val)
                 am_in_cell.alignment = center
                 am_in_cell.border = border
                 
                 # AM Out
                 am_out_cell = ws.cell(row=current_row, column=3)
-                am_out_cell.value = "" if pd.isna(row_data["AM Out"]) else str(row_data["AM Out"])
+                am_out_val = row_data["AM Out"]
+                am_out_cell.value = "" if pd.isna(am_out_val) else str(am_out_val)
                 am_out_cell.alignment = center
                 am_out_cell.border = border
                 
                 # PM In
                 pm_in_cell = ws.cell(row=current_row, column=4)
-                pm_in_cell.value = "" if pd.isna(row_data["PM In"]) else str(row_data["PM In"])
+                pm_in_val = row_data["PM In"]
+                pm_in_cell.value = "" if pd.isna(pm_in_val) else str(pm_in_val)
                 pm_in_cell.alignment = center
                 pm_in_cell.border = border
                 
                 # PM Out
                 pm_out_cell = ws.cell(row=current_row, column=5)
-                pm_out_cell.value = "" if pd.isna(row_data["PM Out"]) else str(row_data["PM Out"])
+                pm_out_val = row_data["PM Out"]
+                pm_out_cell.value = "" if pd.isna(pm_out_val) else str(pm_out_val)
                 pm_out_cell.alignment = center
                 pm_out_cell.border = border
 
@@ -185,7 +206,10 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
             current_row += 1
 
         # -------- TOTAL ROW --------
+        # Merge cells first
         ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=5)
+        
+        # Set value in top-left cell
         total_cell = ws.cell(row=current_row, column=1)
         total_cell.value = "TOTAL"
         total_cell.alignment = center
@@ -195,11 +219,17 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
         for col in range(1, 8):
             cell = ws.cell(row=current_row, column=col)
             cell.border = border
+            # Set empty values for undertime columns
+            if col in [6, 7]:
+                cell.value = ""
 
         current_row += 3
 
         # -------- FOOTER --------
+        # Merge cells first
         ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row + 2, end_column=7)
+        
+        # Set value in top-left cell
         footer_cell = ws.cell(row=current_row, column=1)
         footer_cell.value = (
             "I certify on my honor that the above is a true and correct report of the\n"
@@ -210,9 +240,11 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
         current_row += 4
         
-        # Signature line
+        # Signature line - Merge first
         ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=3)
         ws.merge_cells(start_row=current_row, start_column=5, end_row=current_row, end_column=7)
+        
+        # Set value in top-left cell of right merge
         signature_cell = ws.cell(row=current_row, column=5)
         signature_cell.value = "Principal III"
         signature_cell.alignment = center
