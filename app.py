@@ -70,31 +70,31 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
     r = 1
 
-    def merge_row(text, size=1, bold_text=True):
-        nonlocal r
-        ws.merge_cells(start_row=r, start_column=1, end_row=r + size - 1, end_column=7)
+    def write_merged(text, rows=1, is_bold=True):
+        global r
+        ws.merge_cells(start_row=r, start_column=1, end_row=r + rows - 1, end_column=7)
         cell = ws.cell(r, 1)
         cell.value = text
         cell.alignment = center
-        if bold_text:
+        if is_bold:
             cell.font = bold
-        r += size
+        r += rows
 
     # -------- HEADER --------
-    merge_row("REPUBLIC OF THE PHILIPPINES")
-    merge_row("Department of Education")
-    merge_row("Division of Davao del Sur")
-    merge_row("MANUAL NATIONAL HIGH SCHOOL")
+    write_merged("REPUBLIC OF THE PHILIPPINES")
+    write_merged("Department of Education")
+    write_merged("Division of Davao del Sur")
+    write_merged("MANUAL NATIONAL HIGH SCHOOL")
     r += 1
-    merge_row("DAILY TIME RECORD")
-    merge_row("-----o0o-----")
+    write_merged("DAILY TIME RECORD")
+    write_merged("-----o0o-----")
     r += 1
-    merge_row(f"Name: {employee_name}")
-    merge_row(f"For the month of: {month} {year}")
+    write_merged(f"Name: {employee_name}")
+    write_merged(f"For the month of: {month} {year}")
     r += 1
-    merge_row("Official hours for arrival and departure")
-    merge_row(f"Regular days: {am_hours} / {pm_hours}")
-    merge_row(f"Saturdays: {saturday_hours}")
+    write_merged("Official hours for arrival and departure")
+    write_merged(f"Regular days: {am_hours} / {pm_hours}")
+    write_merged(f"Saturdays: {saturday_hours}")
     r += 2
 
     # -------- TABLE HEADER --------
