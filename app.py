@@ -66,46 +66,102 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
     widths = [6, 10, 10, 10, 10, 10, 10]
     for i, w in enumerate(widths, 1):
-        col_letter = chr(64 + i) if i <= 26 else chr(64 + (i // 26)) + chr(64 + (i % 26))
+        col_letter = chr(64 + i)
         ws.column_dimensions[col_letter].width = w
 
-    r = 1
+    r = 1  # Start at row 1
 
-    # ---------- REVISED write_merged FUNCTION ----------
-    def write_merged(text, rows=1, is_bold=True):
-        nonlocal r
-        start_row = r
-        ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row + rows - 1, end_column=7)
-        cell = ws.cell(row=start_row, column=1)
-        cell.value = "" if text is None else str(text)
-        cell.alignment = center
-        if is_bold:
-            cell.font = bold
-        r += rows
-
-    # -------- HEADER --------
-    write_merged("REPUBLIC OF THE PHILIPPINES")
-    write_merged("Department of Education")
-    write_merged("Division of Davao del Sur")
-    write_merged("MANUAL NATIONAL HIGH SCHOOL")
-    write_merged("", rows=1, is_bold=False)  # Empty row
-    write_merged("DAILY TIME RECORD")
-    write_merged("-----o0o-----")
-    write_merged("", rows=1, is_bold=False)  # Empty row
-    write_merged(f"Name: {employee_name}")
-    write_merged(f"For the month of: {month} {year}")
-    write_merged("", rows=1, is_bold=False)  # Empty row
-    write_merged("Official hours for arrival and departure")
-    write_merged(f"Regular days: {am_hours} / {pm_hours}")
-    write_merged(f"Saturdays: {saturday_hours}")
-    write_merged("", rows=2, is_bold=False)  # 2 empty rows
+    # -------- HEADER (DIRECT CODING) --------
+    # REPUBLIC OF THE PHILIPPINES
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value="REPUBLIC OF THE PHILIPPINES").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # Department of Education
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value="Department of Education").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # Division of Davao del Sur
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value="Division of Davao del Sur").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # MANUAL NATIONAL HIGH SCHOOL
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value="MANUAL NATIONAL HIGH SCHOOL").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # Empty row
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    r += 1
+    
+    # DAILY TIME RECORD
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value="DAILY TIME RECORD").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # -----o0o-----
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value="-----o0o-----").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # Empty row
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    r += 1
+    
+    # Name
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value=f"Name: {employee_name}").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # For the month of
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value=f"For the month of: {month} {year}").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # Empty row
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    r += 1
+    
+    # Official hours for arrival and departure
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value="Official hours for arrival and departure").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # Regular days
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value=f"Regular days: {am_hours} / {pm_hours}").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # Saturdays
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    ws.cell(row=r, column=1, value=f"Saturdays: {saturday_hours}").alignment = center
+    ws.cell(row=r, column=1).font = bold
+    r += 1
+    
+    # 2 empty rows
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    r += 1
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=7)
+    r += 1
 
     # -------- TABLE HEADER --------
     # Top row headers
-    ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=1)
-    ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
-    ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=5)
-    ws.merge_cells(start_row=r, start_column=6, end_row=r, end_column=7)
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=1)  # Day
+    ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)  # A.M.
+    ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=5)  # P.M.
+    ws.merge_cells(start_row=r, start_column=6, end_row=r, end_column=7)  # Undertime
 
     headers = {1: "Day", 2: "A.M.", 4: "P.M.", 6: "Undertime"}
     for col, text in headers.items():
@@ -117,11 +173,6 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     # Second row sub-headers
     r += 1
     sub_headers = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
-    
-    # I-debug muna kung may laman ang sub_headers
-    if not sub_headers or len(sub_headers) == 0:
-        st.error("Error: sub_headers is empty!")
-        st.stop()
     
     for c, text in enumerate(sub_headers, start=1):
         cell = ws.cell(row=r, column=c)
@@ -230,6 +281,6 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     st.download_button(
         "📥 Download Excel File",
         buffer.getvalue(),
-        file_name=f"DTR_{employee_name}_{month}_{year}.xlsx",
+        file_name=f"DTR_{employee_name.replace(', ', '_').replace(' ', '_')}_{month}_{year}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
