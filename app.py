@@ -1,226 +1,191 @@
 import streamlit as st
 import pandas as pd
+import calendar
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font, Border, Side
 from io import BytesIO
-from datetime import datetime
 
-# Page Configuration
-st.set_page_config(page_title="DTR Excel Generator", layout="wide")
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="DTR Generator (CS Form 48)", layout="wide")
+st.title("📋 Daily Time Record Generator (CS Form No. 48)")
 
-st.title("📋 DTR Excel Generator")
-st.markdown("---")
-
-# Input Form sa Sidebar
+# ---------------- SIDEBAR ----------------
 with st.sidebar:
     st.header("Employee Information")
-    
     employee_name = st.text_input("Employee Name", "SAMORANOS, RICHARD P.")
-    month_year = st.text_input("Month and Year", "DECEMBER 2025")
-    
-    st.header("Office Hours")
-    am_in = st.text_input("AM In", "07:30")
-    am_out = st.text_input("AM Out", "11:50")
-    pm_in = st.text_input("PM In", "12:50")
-    pm_out = st.text_input("PM Out", "16:30")
-    saturday_hours = st.text_input("Saturday Hours", "AS REQUIRED")
-    
-    st.header("Generate DTR")
-    if st.button("Generate Excel File", type="primary"):
-        st.session_state.generate = True
 
-# Main Content
-if 'generate' not in st.session_state:
-    st.session_state.generate = False
+    month = st.selectbox("Month", list(calendar.month_name)[1:])
+    year = st.number_input("Year", min_value=2020, max_value=2100, value=2026)
 
-if st.session_state.generate:
-    # Create Excel file in memory
-    output = BytesIO()
-    
-    # Create a Pandas Excel writer using BytesIO
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # Create DataFrame para sa header information
-        header_data = {
-            'REPUBLIC OF THE PHILIPPINES': [''],
-            'Department of Education': [''],
-            'Division of Davao del Sur': [''],
-            'MANUAL NATIONAL HIGH SCHOOL': [''],
-            '': [''],
-            'DAILY TIME RECORD': [''],
-            '---000---': [''],
-            '': [''],
-            'Employee Name': [employee_name],
-            'For the month of': [month_year],
-            '': [''],
-            'Official hours for arrival and departure': [''],
-            'Regular days': [f'{am_in} - {am_out} / {pm_in} - {pm_out}'],
-            'Saturday': [saturday_hours],
-            '': [''],
-        }
-        
-        header_df = pd.DataFrame(header_data)
-        header_df.to_excel(writer, sheet_name='DTR', index=False, startrow=0, startcol=0)
-        
-        # Create the main table
-        table_data = []
-        
-        # Column headers
-        table_headers = [
-            ['Day', 'A.M.', 'A.M.', 'P.M.', 'P.M.', 'Undertime', 'Undertime'],
-            ['', 'Arrival', 'Departure', 'Arrival', 'Departure', 'Hours', 'Minutes']
-        ]
-        
-        for headers in table_headers:
-            table_data.append(headers)
-        
-        # Add data for each day of the month (assuming 31 days)
-        for day in range(1, 32):
-            row = [day, '', '', '', '', '', '']  # Empty row by default
-            
-            # Sample data - dito mo ilalagay ang actual time entries
-            if day == 1:
-                row = [1, '07:00', '11:46', '16:36', '16:36', '3', '14']
-            elif day == 2:
-                row = [2, '07:25', '11:48', '16:40', '16:40', '3', '37']
-            elif day == 3:
-                row = [3, '07:29', '11:46', '16:41', '16:41', '3', '43']
-            elif day == 4:
-                row = [4, '07:28', '11:49', '16:46', '16:46', '3', '39']
-            elif day == 5:
-                row = [5, '07:29', '11:41', '16:37', '16:37', '3', '48']
-            elif day == 6:
-                row = [6, 'SATURDAY', '', '', '', '', '']
-            elif day == 7:
-                row = [7, 'SUNDAY', '', '', '', '', '']
-            elif day == 13:
-                row = [13, 'SATURDAY', '', '', '', '', '']
-            elif day == 14:
-                row = [14, 'SUNDAY', '', '', '', '', '']
-            elif day == 17:
-                row = [17, '07:33', '11:41', '16:54', '16:54', '3', '52']
-            
-            table_data.append(row)
-        
-        # Add total row
-        table_data.append(['TOTAL', '', '', '', '', '', ''])
-        
-        # Convert to DataFrame and write to Excel
-        table_df = pd.DataFrame(table_data)
-        table_df.to_excel(writer, sheet_name='DTR', index=False, header=False, startrow=len(header_df) + 1)
-        
-        # Add footer
-        footer_data = {
-            'Certification': [''],
-            'I certify on my honor that the above is a true and correct report': [''],
-            'of the hours of work performed, record of which was made daily': [''],
-            'at the time of arrival and departure from office.': [''],
-            '': [''],
-            '___________________________________': [''],
-            '(Signature of Employee)': [''],
-            '': [''],
-            'VERIFIED as to the prescribed office hours:': [''],
-            '': [''],
-            '___________________________________': [''],
-            'Principal III': ['']
-        }
-        
-        footer_df = pd.DataFrame(footer_data)
-        footer_df.to_excel(writer, sheet_name='DTR', index=False, header=False, 
-                          startrow=len(header_df) + len(table_df) + 3)
-        
-        # Adjust column widths
-        worksheet = writer.sheets['DTR']
-        for col in worksheet.columns:
-            max_length = 0
-            column = col[0].column_letter  # Get the column name
-            for cell in col:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = (max_length + 2)
-            worksheet.column_dimensions[column].width = adjusted_width
-    
-    # Get the Excel file data
-    excel_data = output.getvalue()
-    
-    # Download button
+    st.header("Official Office Hours")
+    am_hours = st.text_input("AM Hours", "07:30 AM – 11:50 AM")
+    pm_hours = st.text_input("PM Hours", "12:50 PM – 04:30 PM")
+    saturday_hours = st.text_input("Saturday", "AS REQUIRED")
+
+# ---------------- DAILY TIME INPUT ----------------
+month_index = list(calendar.month_name).index(month)
+num_days = calendar.monthrange(year, month_index)[1]
+
+rows = []
+for day in range(1, num_days + 1):
+    weekday = calendar.weekday(year, month_index, day)
+
+    if weekday == 5:
+        rows.append({"Day": day, "AM In": "SATURDAY", "AM Out": "", "PM In": "", "PM Out": ""})
+    elif weekday == 6:
+        rows.append({"Day": day, "AM In": "SUNDAY", "AM Out": "", "PM In": "", "PM Out": ""})
+    else:
+        rows.append({
+            "Day": day,
+            "AM In": "07:30",
+            "AM Out": "11:50",
+            "PM In": "12:50",
+            "PM Out": "16:30"
+        })
+
+dtr_df = pd.DataFrame(rows)
+
+st.subheader("🕒 Daily Time Entries")
+edited_df = st.data_editor(
+    dtr_df,
+    hide_index=True,
+    use_container_width=True
+)
+
+# ---------------- GENERATE BUTTON ----------------
+if st.button("📄 Generate DTR Excel File", type="primary"):
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "DTR"
+
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    bold = Font(bold=True)
+    thin = Side(style="thin")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    widths = [6, 10, 10, 10, 10, 10, 10]
+    for i, w in enumerate(widths, 1):
+        ws.column_dimensions[chr(64 + i)].width = w
+
+    r = 1
+
+    def merge_row(text, size=1, bold_text=True):
+        nonlocal r
+        ws.merge_cells(start_row=r, start_column=1, end_row=r + size - 1, end_column=7)
+        cell = ws.cell(r, 1)
+        cell.value = text
+        cell.alignment = center
+        if bold_text:
+            cell.font = bold
+        r += size
+
+    # -------- HEADER --------
+    merge_row("REPUBLIC OF THE PHILIPPINES")
+    merge_row("Department of Education")
+    merge_row("Division of Davao del Sur")
+    merge_row("MANUAL NATIONAL HIGH SCHOOL")
+    r += 1
+    merge_row("DAILY TIME RECORD")
+    merge_row("-----o0o-----")
+    r += 1
+    merge_row(f"Name: {employee_name}")
+    merge_row(f"For the month of: {month} {year}")
+    r += 1
+    merge_row("Official hours for arrival and departure")
+    merge_row(f"Regular days: {am_hours} / {pm_hours}")
+    merge_row(f"Saturdays: {saturday_hours}")
+    r += 2
+
+    # -------- TABLE HEADER --------
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=1)
+    ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
+    ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=5)
+    ws.merge_cells(start_row=r, start_column=6, end_row=r, end_column=7)
+
+    ws.cell(r, 1).value = "Day"
+    ws.cell(r, 2).value = "A.M."
+    ws.cell(r, 4).value = "P.M."
+    ws.cell(r, 6).value = "Undertime"
+
+    for col in [1, 2, 4, 6]:
+        ws.cell(r, col).alignment = center
+        ws.cell(r, col).font = bold
+
+    r += 1
+    sub_headers = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
+    for c, text in enumerate(sub_headers, 1):
+        cell = ws.cell(r, c)
+        cell.value = text
+        cell.alignment = center
+        cell.font = bold
+        cell.border = border
+
+    r += 1
+
+    # -------- TABLE DATA --------
+    for _, row in edited_df.iterrows():
+        ws.cell(r, 1).value = row["Day"]
+        ws.cell(r, 1).alignment = center
+
+        if row["AM In"] in ["SATURDAY", "SUNDAY"]:
+            ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
+            ws.cell(r, 2).value = row["AM In"]
+            ws.cell(r, 2).alignment = center
+        else:
+            ws.cell(r, 2).value = row["AM In"]
+            ws.cell(r, 3).value = row["AM Out"]
+            ws.cell(r, 4).value = row["PM In"]
+            ws.cell(r, 5).value = row["PM Out"]
+
+        for c in range(1, 8):
+            ws.cell(r, c).alignment = center
+            ws.cell(r, c).border = border
+
+        r += 1
+
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
+    ws.cell(r, 1).value = "TOTAL"
+    ws.cell(r, 1).alignment = center
+    ws.cell(r, 1).font = bold
+
+    r += 3
+
+    # -------- FOOTER --------
+    ws.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=7)
+    ws.cell(r, 1).value = (
+        "I certify on my honor that the above is a true and correct report of the\n"
+        "hours of work performed, record of which was made daily at the time of\n"
+        "arrival and departure from office."
+    )
+    ws.cell(r, 1).alignment = center
+
+    r += 4
+    ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
+    ws.merge_cells(start_row=r, start_column=5, end_row=r, end_column=7)
+    ws.cell(r, 5).value = "Principal III"
+    ws.cell(r, 5).alignment = center
+
+    # -------- PRINT SETTINGS (A4) --------
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+    ws.page_setup.fitToHeight = 1
+    ws.page_setup.fitToWidth = 1
+    ws.page_margins.left = 0.5
+    ws.page_margins.right = 0.5
+    ws.page_margins.top = 0.75
+    ws.page_margins.bottom = 0.75
+    ws.page_setup.horizontalCentered = True
+    ws.print_title_rows = "1:18"
+
+    # -------- DOWNLOAD --------
+    buffer = BytesIO()
+    wb.save(buffer)
+
     st.success("✅ DTR Excel file generated successfully!")
-    
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.download_button(
-            label="📥 Download Excel File",
-            data=excel_data,
-            file_name=f"DTR_{employee_name.split(',')[0]}_{month_year.replace(' ', '_')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    
-    # Preview the data
-    st.subheader("Preview of Generated DTR")
-    
-    # Display preview
-    st.write("**Header Information:**")
-    st.write(f"Employee: {employee_name}")
-    st.write(f"Month: {month_year}")
-    st.write(f"Regular Hours: {am_in} - {am_out} / {pm_in} - {pm_out}")
-    st.write(f"Saturday: {saturday_hours}")
-    
-    st.write("\n**Time Entries (Sample Data):**")
-    preview_df = pd.DataFrame(table_data[2:-1], columns=table_data[0])
-    st.dataframe(preview_df, use_container_width=True)
-    
-    st.write("\n**Instructions:**")
-    st.info("""
-    1. Click the download button above to get the Excel file
-    2. Open the file in Microsoft Excel
-    3. Adjust formatting as needed (merge cells, borders, etc.)
-    4. Print from Excel (Ctrl+P)
-    """)
-    
-    # Reset button
-    if st.button("Generate Another DTR"):
-        st.session_state.generate = False
-        st.rerun()
-
-else:
-    # Instructions page
-    st.subheader("How to Use This DTR Generator")
-    
-    st.markdown("""
-    ### 📝 Step-by-Step Guide:
-    
-    1. **Fill in the information** in the sidebar on the left
-    2. **Click 'Generate Excel File'** button
-    3. **Download** the generated Excel file
-    4. **Open** in Microsoft Excel
-    5. **Format** if needed (adjust column widths, add borders)
-    6. **Print** from Excel
-    
-    ### 📋 Information Needed:
-    - Employee Name
-    - Month and Year
-    - Regular Office Hours (AM In/Out, PM In/Out)
-    - Saturday Hours
-    
-    ### ⚡ Quick Start:
-    Just click the "Generate Excel File" button in the sidebar to use the sample data.
-    """)
-    
-    # Sample Preview
-    st.subheader("Sample Output Preview")
-    
-    sample_data = {
-        'Day': ['1', '2', '3', '...', '17'],
-        'AM Arrival': ['07:00', '07:25', '07:29', '...', '07:33'],
-        'AM Departure': ['11:46', '11:48', '11:46', '...', '11:41'],
-        'PM Arrival': ['16:36', '16:40', '16:41', '...', '16:54'],
-        'PM Departure': ['16:36', '16:40', '16:41', '...', '16:54'],
-        'Undertime Hrs': ['3', '3', '3', '...', '3'],
-        'Undertime Min': ['14', '37', '43', '...', '52']
-    }
-    
-    st.table(pd.DataFrame(sample_data))
-
-# Footer
-st.markdown("---")
-st.caption("DTR Excel Generator v1.0 | Designed for Manual National High School")
+    st.download_button(
+        "📥 Download Excel File",
+        buffer.getvalue(),
+        file_name=f"DTR_{employee_name}_{month}_{year}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
