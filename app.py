@@ -74,7 +74,7 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
         global r
         ws.merge_cells(start_row=r, start_column=1, end_row=r + rows - 1, end_column=7)
         cell = ws.cell(r, 1)
-        cell.value = text
+        cell.value = "" if text is None else str(text)
         cell.alignment = center
         if is_bold:
             cell.font = bold
@@ -103,12 +103,9 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=5)
     ws.merge_cells(start_row=r, start_column=6, end_row=r, end_column=7)
 
-    ws.cell(r, 1).value = "Day"
-    ws.cell(r, 2).value = "A.M."
-    ws.cell(r, 4).value = "P.M."
-    ws.cell(r, 6).value = "Undertime"
-
-    for col in [1, 2, 4, 6]:
+    headers = {1: "Day", 2: "A.M.", 4: "P.M.", 6: "Undertime"}
+    for col, text in headers.items():
+        ws.cell(r, col).value = text
         ws.cell(r, col).alignment = center
         ws.cell(r, col).font = bold
 
@@ -133,10 +130,10 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
             ws.cell(r, 2).value = row["AM In"]
             ws.cell(r, 2).alignment = center
         else:
-            ws.cell(r, 2).value = row["AM In"]
-            ws.cell(r, 3).value = row["AM Out"]
-            ws.cell(r, 4).value = row["PM In"]
-            ws.cell(r, 5).value = row["PM Out"]
+            ws.cell(r, 2).value = "" if pd.isna(row["AM In"]) else row["AM In"]
+            ws.cell(r, 3).value = "" if pd.isna(row["AM Out"]) else row["AM Out"]
+            ws.cell(r, 4).value = "" if pd.isna(row["PM In"]) else row["PM In"]
+            ws.cell(r, 5).value = "" if pd.isna(row["PM Out"]) else row["PM Out"]
 
         for c in range(1, 8):
             ws.cell(r, c).alignment = center
