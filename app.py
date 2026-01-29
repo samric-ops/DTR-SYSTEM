@@ -66,7 +66,8 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
     widths = [6, 10, 10, 10, 10, 10, 10]
     for i, w in enumerate(widths, 1):
-        ws.column_dimensions[chr(64 + i)].width = w
+        col_letter = chr(64 + i) if i <= 26 else chr(64 + (i // 26)) + chr(64 + (i % 26))
+        ws.column_dimensions[col_letter].width = w
 
     r = 1
 
@@ -75,7 +76,7 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
         nonlocal r
         start_row = r
         ws.merge_cells(start_row=start_row, start_column=1, end_row=start_row + rows - 1, end_column=7)
-        cell = ws.cell(start_row, 1)
+        cell = ws.cell(row=start_row, column=1)
         cell.value = "" if text is None else str(text)
         cell.alignment = center
         if is_bold:
@@ -87,10 +88,10 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     write_merged("Department of Education")
     write_merged("Division of Davao del Sur")
     write_merged("MANUAL NATIONAL HIGH SCHOOL")
-    write_merged("", rows=1, is_bold=False)  # Empty row instead of r += 1
+    write_merged("", rows=1, is_bold=False)  # Empty row
     write_merged("DAILY TIME RECORD")
     write_merged("-----o0o-----")
-    write_merged("", rows=1, is_bold=False)  # Empty row instead of r += 1
+    write_merged("", rows=1, is_bold=False)  # Empty row
     write_merged(f"Name: {employee_name}")
     write_merged(f"For the month of: {month} {year}")
     write_merged("", rows=1, is_bold=False)  # Empty row
@@ -100,6 +101,7 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     write_merged("", rows=2, is_bold=False)  # 2 empty rows
 
     # -------- TABLE HEADER --------
+    # Top row headers
     ws.merge_cells(start_row=r, start_column=1, end_row=r + 1, end_column=1)
     ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
     ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=5)
@@ -107,63 +109,105 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
 
     headers = {1: "Day", 2: "A.M.", 4: "P.M.", 6: "Undertime"}
     for col, text in headers.items():
-        ws.cell(r, col).value = text
-        ws.cell(r, col).alignment = center
-        ws.cell(r, col).font = bold
-
-    r += 1
-    sub_headers = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
-    for c, text in enumerate(sub_headers, 1):
-        cell = ws.cell(r, c)
+        cell = ws.cell(row=r, column=col)
         cell.value = text
         cell.alignment = center
         cell.font = bold
+
+    # Second row sub-headers
+    r += 1
+    sub_headers = ["", "Arrival", "Departure", "Arrival", "Departure", "Hours", "Minutes"]
+    
+    # I-debug muna kung may laman ang sub_headers
+    if not sub_headers or len(sub_headers) == 0:
+        st.error("Error: sub_headers is empty!")
+        st.stop()
+    
+    for c, text in enumerate(sub_headers, start=1):
+        cell = ws.cell(row=r, column=c)
+        cell.value = text
+        cell.alignment = center
+        cell.font = Font(bold=True)
         cell.border = border
 
     r += 1
 
     # -------- TABLE DATA --------
     for _, row in edited_df.iterrows():
-        ws.cell(r, 1).value = row["Day"]
-        ws.cell(r, 1).alignment = center
+        # Day column
+        cell_day = ws.cell(row=r, column=1)
+        cell_day.value = row["Day"]
+        cell_day.alignment = center
+        cell_day.border = border
 
         if row["AM In"] in ["SATURDAY", "SUNDAY"]:
             ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=5)
-            ws.cell(r, 2).value = row["AM In"]
-            ws.cell(r, 2).alignment = center
+            cell_merged = ws.cell(row=r, column=2)
+            cell_merged.value = row["AM In"]
+            cell_merged.alignment = center
+            cell_merged.border = border
         else:
-            ws.cell(r, 2).value = "" if pd.isna(row["AM In"]) else row["AM In"]
-            ws.cell(r, 3).value = "" if pd.isna(row["AM Out"]) else row["AM Out"]
-            ws.cell(r, 4).value = "" if pd.isna(row["PM In"]) else row["PM In"]
-            ws.cell(r, 5).value = "" if pd.isna(row["PM Out"]) else row["PM Out"]
+            # AM In (Arrival)
+            cell_am_in = ws.cell(row=r, column=2)
+            cell_am_in.value = "" if pd.isna(row["AM In"]) else str(row["AM In"])
+            cell_am_in.alignment = center
+            cell_am_in.border = border
+            
+            # AM Out (Departure)
+            cell_am_out = ws.cell(row=r, column=3)
+            cell_am_out.value = "" if pd.isna(row["AM Out"]) else str(row["AM Out"])
+            cell_am_out.alignment = center
+            cell_am_out.border = border
+            
+            # PM In (Arrival)
+            cell_pm_in = ws.cell(row=r, column=4)
+            cell_pm_in.value = "" if pd.isna(row["PM In"]) else str(row["PM In"])
+            cell_pm_in.alignment = center
+            cell_pm_in.border = border
+            
+            # PM Out (Departure)
+            cell_pm_out = ws.cell(row=r, column=5)
+            cell_pm_out.value = "" if pd.isna(row["PM Out"]) else str(row["PM Out"])
+            cell_pm_out.alignment = center
+            cell_pm_out.border = border
 
-        for c in range(1, 8):
-            ws.cell(r, c).alignment = center
-            ws.cell(r, c).border = border
+        # Undertime columns (blank by default)
+        for c in [6, 7]:
+            cell = ws.cell(row=r, column=c)
+            cell.alignment = center
+            cell.border = border
 
         r += 1
 
+    # -------- TOTAL ROW --------
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=5)
-    ws.cell(r, 1).value = "TOTAL"
-    ws.cell(r, 1).alignment = center
-    ws.cell(r, 1).font = bold
+    total_cell = ws.cell(row=r, column=1)
+    total_cell.value = "TOTAL"
+    total_cell.alignment = center
+    total_cell.font = bold
+    
+    # Add border to total row
+    for c in range(1, 8):
+        ws.cell(row=r, column=c).border = border
 
     r += 3
 
     # -------- FOOTER --------
     ws.merge_cells(start_row=r, start_column=1, end_row=r + 2, end_column=7)
-    ws.cell(r, 1).value = (
+    footer_cell = ws.cell(row=r, column=1)
+    footer_cell.value = (
         "I certify on my honor that the above is a true and correct report of the\n"
         "hours of work performed, record of which was made daily at the time of\n"
         "arrival and departure from office."
     )
-    ws.cell(r, 1).alignment = center
+    footer_cell.alignment = center
 
     r += 4
     ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=3)
     ws.merge_cells(start_row=r, start_column=5, end_row=r, end_column=7)
-    ws.cell(r, 5).value = "Principal III"
-    ws.cell(r, 5).alignment = center
+    signature_cell = ws.cell(row=r, column=5)
+    signature_cell.value = "Principal III"
+    signature_cell.alignment = center
 
     # -------- PRINT SETTINGS (A4) --------
     ws.page_setup.paperSize = ws.PAPERSIZE_A4
@@ -180,6 +224,7 @@ if st.button("📄 Generate DTR Excel File", type="primary"):
     # -------- DOWNLOAD --------
     buffer = BytesIO()
     wb.save(buffer)
+    buffer.seek(0)
 
     st.success("✅ DTR Excel file generated successfully!")
     st.download_button(
