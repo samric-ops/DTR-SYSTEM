@@ -72,14 +72,14 @@ if uploaded:
     if st.button("Generate .docx"):
         doc = Document(uploaded)
         def replace_tokens(document, tokens):
-            # Replace in all paragraphs in body
+            # Replace in body paragraphs
             for p in document.paragraphs:
                 for r in p.runs:
                     if r.text:
                         for k, v in tokens.items():
                             if k in r.text:
                                 r.text = r.text.replace(k, v or "")
-            # Replace in tables (very important for this template)
+            # Replace in tables
             for tbl in document.tables:
                 for row in tbl.rows:
                     for cell in row.cells:
